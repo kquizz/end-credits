@@ -37,10 +37,23 @@ class CastsController < ApplicationController
   # Lazy-loaded by the movie/episode pages: the same cast, now with EGOT cells filled in.
   def table
     cast = table_cast
-    @rows = CastEgotLookup.new(tmdb: tmdb).call(cast)
+    if params[:tool] == "ages"
+      @on = premiere_date
+      @rows = AgeLookup.new(tmdb: tmdb).call(cast, on: @on)
+      render :ages_table
+    else
+      @rows = CastEgotLookup.new(tmdb: tmdb).call(cast)
+    end
   end
 
   private
+
+  def premiere_date
+    case params[:kind]
+    when "movie" then tmdb.movie(params[:id]).date
+    when "episode" then tmdb.season_episodes(params[:id], params[:season]).find { |e| e.number.to_s == params[:episode] }&.date
+    end
+  end
 
   def table_cast
     case params[:kind]

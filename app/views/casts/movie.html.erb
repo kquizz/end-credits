@@ -1,7 +1,8 @@
 <% content_for :title, "#{@movie.name} cast" %>
 
 <div class="w-full max-w-4xl mx-auto">
-  <%= link_to "← Search", cast_path, class: "text-sm text-slate-500 hover:underline" %>
+  <%= link_to "← Search", tool_path, class: "text-sm text-slate-500 hover:underline" %>
   <h1 class="text-3xl font-bold mt-2"><%= @movie.name %> <span class="text-slate-400 font-normal"><%= "(#{@movie.year})" if @movie.year %></span></h1>
+  <% if ages? %><p class="text-slate-500">Released <%= long_date(@movie.date) || "on an unknown date" %></p><% end %>
   <%= render "table_frame", cast: @cast, table_params: @table_params %>
 </div>

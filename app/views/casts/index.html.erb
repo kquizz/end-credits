@@ -1,10 +1,10 @@
-<% content_for :title, "Cast & EGOTs" %>
+<% content_for :title, tool_entry.title %>
 
 <div class="w-full max-w-2xl mx-auto">
-  <h1 class="text-3xl font-bold mb-1">Cast &amp; EGOTs</h1>
-  <p class="text-slate-500 mb-6">Pick a movie or a TV episode and see who in the cast has won what.</p>
+  <h1 class="text-3xl font-bold mb-1"><%= tool_entry.title %></h1>
+  <p class="text-slate-500 mb-6"><%= ages? ? "Pick a movie or a TV episode and see how old everyone was when it premiered." : "Pick a movie or a TV episode and see who in the cast has won what." %></p>
 
-  <%= form_with url: cast_path, method: :get,
+  <%= form_with url: tool_path, method: :get,
         data: { controller: "search", turbo_frame: "titles" } do |f| %>
     <%= f.search_field :q, value: @query, autofocus: true, autocomplete: "off",
           placeholder: "Search a movie or show…",

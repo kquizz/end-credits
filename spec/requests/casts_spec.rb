@@ -41,7 +41,7 @@ RSpec.describe "Cast", type: :request do
 
   describe "GET /cast/movies/:id" do
     before do
-      allow(tmdb).to receive(:movie).with("949").and_return(TmdbClient::Title.new(id: 949, name: "Heat", year: 1995))
+      allow(tmdb).to receive(:movie).with("949").and_return(TmdbClient::Title.new(id: 949, name: "Heat", date: Date.new(1995, 12, 15)))
       allow(tmdb).to receive(:movie_cast).with("949").and_return(cast)
     end
 
@@ -56,7 +56,7 @@ RSpec.describe "Cast", type: :request do
 
   describe "TV navigation" do
     let(:show) { { name: "Show", seasons: [ TmdbClient::Season.new(number: 2, name: "Season 2", episode_count: 3) ] } }
-    let(:episodes) { [ TmdbClient::Episode.new(number: 3, name: "The One", air_date: "2020-01-02") ] }
+    let(:episodes) { [ TmdbClient::Episode.new(number: 3, name: "The One", date: Date.new(2020, 1, 2)) ] }
 
     before do
       allow(tmdb).to receive(:tv).with("7").and_return(show)

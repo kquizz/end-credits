@@ -1,15 +1,15 @@
 <% content_for :title, "#{@show[:name]} season #{@season}" %>
 
 <div class="w-full max-w-2xl mx-auto">
-  <%= link_to "← #{@show[:name]}", cast_show_path(params[:id]), class: "text-sm text-slate-500 hover:underline" %>
+  <%= link_to "← #{@show[:name]}", tool_path(:show, params[:id]), class: "text-sm text-slate-500 hover:underline" %>
   <h1 class="text-3xl font-bold mt-2 mb-4">Season <%= @season %></h1>
   <ul class="flex flex-col gap-1">
     <% @episodes.each do |e| %>
       <li>
-        <%= link_to cast_episode_path(params[:id], @season, e.number), class: "flex gap-3 p-3 rounded-lg hover:bg-slate-100" do %>
+        <%= link_to tool_path(:episode, params[:id], @season, e.number), class: "flex gap-3 p-3 rounded-lg hover:bg-slate-100" do %>
           <span class="w-8 text-slate-400 text-right"><%= e.number %></span>
           <span class="font-medium"><%= e.name %></span>
-          <% if e.air_date.present? %><span class="ml-auto text-slate-500 text-sm"><%= e.air_date %></span><% end %>
+          <% if e.date %><span class="ml-auto text-slate-500 text-sm"><%= e.date.iso8601 %></span><% end %>
         <% end %>
       </li>
     <% end %>

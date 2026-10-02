@@ -1,4 +1,4 @@
-<% path = result.media_type == "movie" ? cast_movie_path(result.id) : cast_show_path(result.id) %>
+<% path = result.media_type == "movie" ? tool_path(:movie, result.id) : tool_path(:show, result.id) %>
 <%= link_to path, data: { turbo_frame: "_top" },
       class: "flex items-center gap-3 p-2 rounded-lg hover:bg-slate-100" do %>
   <% if result.poster_url %>

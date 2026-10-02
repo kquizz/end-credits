@@ -12,10 +12,15 @@ Rails.application.routes.draw do
   # Defines the root path route ("/")
   root "home#index"
 
-  get "cast", to: "casts#index", as: :cast
-  get "cast/table", to: "casts#table", as: :cast_table
-  get "cast/movies/:id", to: "casts#movie", as: :cast_movie
-  get "cast/shows/:id", to: "casts#show", as: :cast_show
-  get "cast/shows/:id/seasons/:season", to: "casts#season", as: :cast_season
-  get "cast/shows/:id/seasons/:season/episodes/:episode", to: "casts#episode", as: :cast_episode
+  # The EGOT table and the ages table share the same pickers; `tool` picks the table.
+  { "cast" => "egot", "ages" => "ages" }.each do |prefix, tool|
+    defaults tool: tool do
+      get prefix, to: "casts#index", as: prefix
+      get "#{prefix}/table", to: "casts#table", as: "#{prefix}_table"
+      get "#{prefix}/movies/:id", to: "casts#movie", as: "#{prefix}_movie"
+      get "#{prefix}/shows/:id", to: "casts#show", as: "#{prefix}_show"
+      get "#{prefix}/shows/:id/seasons/:season", to: "casts#season", as: "#{prefix}_season"
+      get "#{prefix}/shows/:id/seasons/:season/episodes/:episode", to: "casts#episode", as: "#{prefix}_episode"
+    end
+  end
 end

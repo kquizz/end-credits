@@ -1,0 +1,21 @@
+<% aged = @rows.select(&:known_age?) %>
+<% oldest = aged.max_by { |r| r.age.years } %>
+<% youngest = aged.min_by { |r| r.age.years } %>
+<%= turbo_frame_tag "cast_table", class: "block mt-6" do %>
+  <p class="mb-2 text-sm text-slate-500">
+    <%= pluralize(@rows.size, "cast member") %>
+    <% if aged.any? %>
+      · average <%= (aged.sum { |r| r.age.years }.to_f / aged.size).round %> ·
+      oldest <%= oldest.member.name %> (<%= oldest.age.years %>) ·
+      youngest <%= youngest.member.name %> (<%= youngest.age.years %>)
+    <% end %>
+    <% if @on.nil? %>· <span class="text-amber-600">no premiere date on TMDb, so ages can't be worked out</span><% end %>
+  </p>
+  <table class="w-full text-left">
+    <%= render "head_ages" %>
+    <tbody>
+      <%= render partial: "age_row", collection: @rows, as: :row %>
+    </tbody>
+  </table>
+  <p class="mt-4 text-xs text-slate-400">Birthdays from TMDb. ? means TMDb has no birthday; † means they died before the premiere.</p>
+<% end %>

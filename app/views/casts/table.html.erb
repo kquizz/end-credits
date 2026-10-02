@@ -7,7 +7,7 @@
     <%= matched %> matched to Wikipedia<%= " (? = couldn't match)" if matched < @rows.size %>
   </p>
   <table class="w-full text-left">
-    <%= render "table_head" %>
+    <%= render "head_egot" %>
     <tbody>
       <%= render partial: "row", collection: @rows, as: :row %>
     </tbody>

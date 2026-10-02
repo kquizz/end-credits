@@ -115,7 +115,7 @@ RSpec.describe TmdbClient do
     it "returns the title and year" do
       stub_tmdb("/movie/949", { title: "Heat", release_date: "1995-12-15" })
 
-      expect(client.movie(949)).to have_attributes(name: "Heat", year: 1995)
+      expect(client.movie(949)).to have_attributes(name: "Heat", date: Date.new(1995, 12, 15), year: 1995)
     end
 
     it "raises NotFound on a 404" do
@@ -128,6 +128,29 @@ RSpec.describe TmdbClient do
       stub_request(:get, "https://api.themoviedb.org/3/movie/1").to_return(status: 500, body: "{}")
 
       expect { client.movie(1) }.to raise_error(TmdbClient::Error)
+    end
+  end
+
+  describe "#season_episodes" do
+    it "parses air dates and tolerates a missing one" do
+      stub_tmdb("/tv/9/season/1", { episodes: [
+        { episode_number: 1, name: "Pilot", air_date: "2020-03-04" },
+        { episode_number: 2, name: "Unaired", air_date: nil }
+      ] })
+
+      expect(client.season_episodes(9, 1).map(&:date)).to eq([ Date.new(2020, 3, 4), nil ])
+    end
+  end
+
+  describe "#people_details" do
+    it "returns imdb id and birth/death dates, treating blanks and bad dates as nil" do
+      stub_tmdb("/person/1", { imdb_id: "nm1", birthday: "1965-08-11", deathday: "2019-01-02" })
+      stub_tmdb("/person/2", { imdb_id: "", birthday: "not a date", deathday: nil })
+
+      details = client.people_details([ 1, 2 ])
+
+      expect(details[1]).to have_attributes(imdb_id: "nm1", birthday: Date.new(1965, 8, 11), deathday: Date.new(2019, 1, 2))
+      expect(details[2]).to have_attributes(imdb_id: nil, birthday: nil, deathday: nil)
     end
   end
 

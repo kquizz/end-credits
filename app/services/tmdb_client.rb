@@ -8,10 +8,13 @@ class TmdbClient
   IMAGE_BASE = "https://image.tmdb.org/t/p".freeze
 
   SearchResult = Struct.new(:media_type, :id, :title, :year, :poster_url, keyword_init: true)
-  Title = Struct.new(:id, :name, :year, keyword_init: true)
+  Title = Struct.new(:id, :name, :date, keyword_init: true) do
+    def year = date&.year
+  end
+  PersonDetails = Struct.new(:imdb_id, :birthday, :deathday, keyword_init: true)
   PersonResult = Struct.new(:id, :name, :known_for, :photo_url, keyword_init: true)
   Season = Struct.new(:number, :name, :episode_count, keyword_init: true)
-  Episode = Struct.new(:number, :name, :air_date, keyword_init: true)
+  Episode = Struct.new(:number, :name, :date, keyword_init: true)
   CastMember = Struct.new(:person_id, :name, :character, :photo_url, keyword_init: true)
   Credit = Struct.new(:media_type, :id, :title, :year, :character, :genre_ids, keyword_init: true)
 
@@ -46,7 +49,7 @@ class TmdbClient
 
   def movie(id)
     raw = get("/movie/#{id}")
-    Title.new(id: id, name: raw["title"], year: year_of(raw["release_date"]))
+    Title.new(id: id, name: raw["title"], date: parse_date(raw["release_date"]))
   end
 
   def movie_cast(id)
@@ -65,7 +68,7 @@ class TmdbClient
 
   def season_episodes(tv_id, season_number)
     Array(get("/tv/#{tv_id}/season/#{season_number}")["episodes"]).map do |e|
-      Episode.new(number: e["episode_number"], name: e["name"], air_date: e["air_date"])
+      Episode.new(number: e["episode_number"], name: e["name"], date: parse_date(e["air_date"]))
     end
   end
 
@@ -75,13 +78,15 @@ class TmdbClient
     build_cast("cast" => Array(raw["cast"]) + Array(raw["guest_stars"]))
   end
 
-  def person_imdb_id(person_id)
-    get("/person/#{person_id}")["imdb_id"].presence
+  def person_details(person_id)
+    raw = get("/person/#{person_id}")
+    PersonDetails.new(imdb_id: raw["imdb_id"].presence,
+                      birthday: parse_date(raw["birthday"]), deathday: parse_date(raw["deathday"]))
   end
 
-  # { person_id => imdb_id or nil }. Cold lookups are one request per person, so fan out; a person
-  # TMDb fails on gets nil (and is retried next time, since failures are not cached).
-  def person_imdb_ids(person_ids, concurrency: 8)
+  # { person_id => PersonDetails or nil }. Cold lookups are one request per person, so fan out; a
+  # person TMDb fails on gets nil (and is retried next time, since failures are not cached).
+  def people_details(person_ids, concurrency: 8)
     ids = person_ids.uniq
     return {} if ids.empty?
 
@@ -94,19 +99,24 @@ class TmdbClient
       Thread.new do
         Rails.application.executor.wrap do
           while (id = next_from(queue))
-            imdb = begin
-              person_imdb_id(id)
+            details = begin
+              person_details(id)
             rescue Error, Faraday::Error => e
               Rails.logger.warn("TMDb person #{id} lookup failed: #{e.message}")
               nil
             end
-            lock.synchronize { results[id] = imdb }
+            lock.synchronize { results[id] = details }
           end
         end
       end
     end.each(&:join)
 
     ids.to_h { |id| [ id, results[id] ] }
+  end
+
+  # { person_id => imdb_id or nil }
+  def person_imdb_ids(person_ids, **opts)
+    people_details(person_ids, **opts).transform_values { |d| d&.imdb_id }
   end
 
   # Everything a person has acted in, movies and TV together.
@@ -143,6 +153,12 @@ class TmdbClient
       year: year_of(raw["release_date"] || raw["first_air_date"]),
       poster_url: image_url(raw["poster_path"], "w185")
     )
+  end
+
+  def parse_date(value)
+    value.present? ? Date.iso8601(value) : nil
+  rescue ArgumentError
+    nil
   end
 
   def year_of(date)

@@ -1,0 +1,23 @@
+<tr class="border-t border-slate-200">
+  <td class="py-2 pr-3 font-medium">
+    <div class="flex items-center gap-3">
+      <% if row.member.photo_url %>
+        <%= image_tag row.member.photo_url, class: "size-9 rounded-full object-cover", loading: "lazy", alt: "" %>
+      <% else %>
+        <div class="size-9 rounded-full bg-slate-200"></div>
+      <% end %>
+      <%= row.member.name %>
+    </div>
+  </td>
+  <td class="py-2 pr-3 text-slate-500"><%= row.member.character %></td>
+  <td class="py-2 text-right tabular-nums">
+    <% if row.unknown? %>
+      <span class="font-bold text-amber-500" title="TMDb has no birthday for this person">?</span>
+    <% elsif row.posthumous? %>
+      <span class="text-slate-400" title="Died in <%= row.deathday.year %>, before the premiere">†</span>
+    <% else %>
+      <span class="text-lg font-semibold" title="Born <%= long_date(row.birthday) %>"><%= row.age.years %></span>
+      <% if row.age.deceased? %><span class="text-xs text-slate-400">(d. <%= row.age.death_year %>)</span><% end %>
+    <% end %>
+  </td>
+</tr>
