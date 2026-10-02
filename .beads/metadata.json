@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "server",
+  "dolt_database": "end_credits",
+  "project_id": "6ead149c-8594-4d4a-95bf-34b0fca6df0b"
+}
