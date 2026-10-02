@@ -1,24 +1,31 @@
-# README
+# End Credits
 
-This README would normally document whatever steps are necessary to get the
-application up and running.
+Small lookups for the things you wonder while watching. Built with Rails 8, Hotwire and Tailwind.
 
-Things you may want to cover:
+| Tool | Path | Status |
+|---|---|---|
+| Cast & EGOTs | `/cast` | live |
+| Cast Ages | `/ages` | live |
+| Co-star Web | — | designed |
+| Six Degrees | — | designed |
+| EGOT Tracker (person search) | — | to migrate from `egot-tracker` |
 
-* Ruby version
+Design docs live in `docs/`.
 
-* System dependencies
+## Data
 
-* Configuration
+- **TMDb** for titles, casts, people and credits. Set `TMDB_API_KEY` (a v3 key) or
+  `TMDB_API_TOKEN` (a v4 read token), or put `tmdb_api_token` in Rails credentials.
+- **Wikidata** maps a person's IMDb id to their English Wikipedia article (exact, not
+  name matching). **Wikipedia** category membership gives award wins. Neither needs a key.
 
-* Database creation
+## Develop
 
-* Database initialization
+```sh
+bundle install
+bin/dev            # server + Tailwind watcher
+bundle exec rspec
+bin/rubocop
+```
 
-* How to run the test suite
-
-* Services (job queues, cache servers, search engines, etc.)
-
-* Deployment instructions
-
-* ...
+New Tailwind classes only appear after a rebuild; `bin/dev` does that for you.
