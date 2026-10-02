@@ -107,16 +107,23 @@ class TmdbClient
   def get(path, query: {})
     query = { query: query } unless query.is_a?(Hash)
     @cache.fetch("tmdb:#{path}:#{query.sort_by { |k, _| k.to_s }.to_h}", expires_in: 30.days) do
-      response = connection.get("#{BASE_URL}#{path}", query)
+      response = connection.get("#{BASE_URL}#{path}", with_auth(query))
       raise "TMDb #{response.status}" unless response.success?
 
       JSON.parse(response.body)
     end
   end
 
+  # v4 read tokens are JWTs and go in a header; v3 keys are plain hex and go in the query string.
+  def bearer? = @token.to_s.start_with?("eyJ")
+
+  def with_auth(query)
+    bearer? ? query : query.merge(api_key: @token)
+  end
+
   def connection
     @connection ||= Faraday.new do |f|
-      f.headers["Authorization"] = "Bearer #{@token}"
+      f.headers["Authorization"] = "Bearer #{@token}" if bearer?
       f.headers["Accept"] = "application/json"
     end
   end

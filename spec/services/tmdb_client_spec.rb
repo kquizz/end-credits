@@ -1,7 +1,7 @@
 require "rails_helper"
 
 RSpec.describe TmdbClient do
-  subject(:client) { described_class.new(token: "t") }
+  subject(:client) { described_class.new(token: "eyJ-test") }
 
   def stub_tmdb(path, body, **opts)
     stub = stub_request(:get, "https://api.themoviedb.org/3#{path}")
@@ -10,9 +10,29 @@ RSpec.describe TmdbClient do
   end
 
   it "sends the bearer token" do
-    stub_tmdb("/search/multi", { results: [] }, headers: { "Authorization" => "Bearer t" },
+    stub_tmdb("/search/multi", { results: [] }, headers: { "Authorization" => "Bearer eyJ-test" },
               query: { "query" => "x" })
     expect(client.search("x")).to eq([])
+  end
+
+  it "sends a v3 api key as a query param instead of a header" do
+    stub = stub_request(:get, "https://api.themoviedb.org/3/search/multi")
+      .with(query: { "query" => "x", "api_key" => "abc123" })
+      .to_return(status: 200, body: { results: [] }.to_json)
+
+    described_class.new(token: "abc123").search("x")
+
+    expect(stub).to have_been_requested
+    expect(a_request(:get, /themoviedb/).with(headers: { "Authorization" => /./ })).not_to have_been_made
+  end
+
+  it "does not put the api key in the cache key" do
+    cache = ActiveSupport::Cache::MemoryStore.new
+    stub_request(:get, /themoviedb/).to_return(status: 200, body: { results: [] }.to_json)
+
+    described_class.new(token: "secretkey", cache: cache).search("x")
+
+    expect(cache.instance_variable_get(:@data).keys.join).not_to include("secretkey")
   end
 
   describe "#search" do
@@ -32,7 +52,7 @@ RSpec.describe TmdbClient do
 
     it "does not call the API for a blank query" do
       expect(client.search(" ")).to eq([])
-      expect(a_request(:get, /tmdb/)).not_to have_been_made
+      expect(a_request(:get, /themoviedb/)).not_to have_been_made
     end
   end
 
