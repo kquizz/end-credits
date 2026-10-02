@@ -11,4 +11,11 @@ Rails.application.routes.draw do
 
   # Defines the root path route ("/")
   root "home#index"
+
+  get "cast", to: "casts#index", as: :cast
+  get "cast/table", to: "casts#table", as: :cast_table
+  get "cast/movies/:id", to: "casts#movie", as: :cast_movie
+  get "cast/shows/:id", to: "casts#show", as: :cast_show
+  get "cast/shows/:id/seasons/:season", to: "casts#season", as: :cast_season
+  get "cast/shows/:id/seasons/:season/episodes/:episode", to: "casts#episode", as: :cast_episode
 end

@@ -1,10 +1,14 @@
 require "faraday"
 
 class TmdbClient
+  class Error < StandardError; end
+  class NotFound < Error; end
+
   BASE_URL = "https://api.themoviedb.org/3".freeze
   IMAGE_BASE = "https://image.tmdb.org/t/p".freeze
 
   SearchResult = Struct.new(:media_type, :id, :title, :year, :poster_url, keyword_init: true)
+  Title = Struct.new(:id, :name, :year, keyword_init: true)
   PersonResult = Struct.new(:id, :name, :known_for, :photo_url, keyword_init: true)
   Season = Struct.new(:number, :name, :episode_count, keyword_init: true)
   Episode = Struct.new(:number, :name, :air_date, keyword_init: true)
@@ -40,6 +44,11 @@ class TmdbClient
     end
   end
 
+  def movie(id)
+    raw = get("/movie/#{id}")
+    Title.new(id: id, name: raw["title"], year: year_of(raw["release_date"]))
+  end
+
   def movie_cast(id)
     build_cast(get("/movie/#{id}/credits"))
   end
@@ -66,6 +75,40 @@ class TmdbClient
     build_cast("cast" => Array(raw["cast"]) + Array(raw["guest_stars"]))
   end
 
+  def person_imdb_id(person_id)
+    get("/person/#{person_id}")["imdb_id"].presence
+  end
+
+  # { person_id => imdb_id or nil }. Cold lookups are one request per person, so fan out; a person
+  # TMDb fails on gets nil (and is retried next time, since failures are not cached).
+  def person_imdb_ids(person_ids, concurrency: 8)
+    ids = person_ids.uniq
+    return {} if ids.empty?
+
+    connection # build the connection once, before the threads race to create it
+    queue = Queue.new.tap { |q| ids.each { |id| q << id } }
+    results = {}
+    lock = Mutex.new
+
+    Array.new([ concurrency, ids.size ].min) do
+      Thread.new do
+        Rails.application.executor.wrap do
+          while (id = next_from(queue))
+            imdb = begin
+              person_imdb_id(id)
+            rescue Error, Faraday::Error => e
+              Rails.logger.warn("TMDb person #{id} lookup failed: #{e.message}")
+              nil
+            end
+            lock.synchronize { results[id] = imdb }
+          end
+        end
+      end
+    end.each(&:join)
+
+    ids.to_h { |id| [ id, results[id] ] }
+  end
+
   # Everything a person has acted in, movies and TV together.
   def person_credits(person_id)
     Array(get("/person/#{person_id}/combined_credits")["cast"]).map do |c|
@@ -79,6 +122,12 @@ class TmdbClient
   end
 
   private
+
+  def next_from(queue)
+    queue.pop(true)
+  rescue ThreadError
+    nil
+  end
 
   def build_cast(credits)
     Array(credits["cast"]).uniq { |m| m["id"] }.map do |m|
@@ -108,7 +157,8 @@ class TmdbClient
     query = { query: query } unless query.is_a?(Hash)
     @cache.fetch("tmdb:#{path}:#{query.sort_by { |k, _| k.to_s }.to_h}", expires_in: 30.days) do
       response = connection.get("#{BASE_URL}#{path}", with_auth(query))
-      raise "TMDb #{response.status}" unless response.success?
+      raise NotFound, "TMDb #{response.status}" if response.status == 404
+      raise Error, "TMDb #{response.status}" unless response.success?
 
       JSON.parse(response.body)
     end

@@ -1,0 +1,16 @@
+<% content_for :title, @show[:name] %>
+
+<div class="w-full max-w-2xl mx-auto">
+  <%= link_to "← Search", cast_path, class: "text-sm text-slate-500 hover:underline" %>
+  <h1 class="text-3xl font-bold mt-2 mb-4"><%= @show[:name] %></h1>
+  <ul class="flex flex-col gap-1">
+    <% @show[:seasons].each do |s| %>
+      <li>
+        <%= link_to cast_season_path(params[:id], s.number), class: "flex justify-between p-3 rounded-lg hover:bg-slate-100" do %>
+          <span class="font-medium"><%= s.name %></span>
+          <span class="text-slate-500 text-sm"><%= pluralize(s.episode_count, "episode") %></span>
+        <% end %>
+      </li>
+    <% end %>
+  </ul>
+</div>

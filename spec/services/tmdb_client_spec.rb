@@ -111,4 +111,44 @@ RSpec.describe TmdbClient do
       expect(client.tv(9)[:seasons].map(&:number)).to eq([ 1 ])
     end
   end
+  describe "#movie" do
+    it "returns the title and year" do
+      stub_tmdb("/movie/949", { title: "Heat", release_date: "1995-12-15" })
+
+      expect(client.movie(949)).to have_attributes(name: "Heat", year: 1995)
+    end
+
+    it "raises NotFound on a 404" do
+      stub_request(:get, "https://api.themoviedb.org/3/movie/0").to_return(status: 404, body: "{}")
+
+      expect { client.movie(0) }.to raise_error(TmdbClient::NotFound)
+    end
+
+    it "raises Error on other failures" do
+      stub_request(:get, "https://api.themoviedb.org/3/movie/1").to_return(status: 500, body: "{}")
+
+      expect { client.movie(1) }.to raise_error(TmdbClient::Error)
+    end
+  end
+
+  describe "#person_imdb_ids" do
+    it "looks up every person and keys the result by person id" do
+      stub_tmdb("/person/1", { imdb_id: "nm1" })
+      stub_tmdb("/person/2", { imdb_id: "" })
+      stub_tmdb("/person/3", { imdb_id: "nm3" })
+
+      expect(client.person_imdb_ids([ 1, 2, 3, 1 ])).to eq(1 => "nm1", 2 => nil, 3 => "nm3")
+    end
+
+    it "gives nil for a person TMDb fails on without losing the rest" do
+      stub_tmdb("/person/1", { imdb_id: "nm1" })
+      stub_request(:get, "https://api.themoviedb.org/3/person/2").to_return(status: 500, body: "{}")
+
+      expect(client.person_imdb_ids([ 1, 2 ])).to eq(1 => "nm1", 2 => nil)
+    end
+
+    it "returns {} for no ids" do
+      expect(client.person_imdb_ids([])).to eq({})
+    end
+  end
 end

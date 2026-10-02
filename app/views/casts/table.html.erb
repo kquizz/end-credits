@@ -1,0 +1,16 @@
+<% winners = @rows.count { |r| r.status&.egot? } %>
+<% matched = @rows.count(&:matched?) %>
+<%= turbo_frame_tag "cast_table", class: "block mt-6" do %>
+  <p class="mb-2 text-sm text-slate-500">
+    <%= pluralize(@rows.size, "cast member") %> ·
+    <%= winners.zero? ? "no EGOTs" : pluralize(winners, "EGOT") %> ·
+    <%= matched %> matched to Wikipedia<%= " (? = couldn't match)" if matched < @rows.size %>
+  </p>
+  <table class="w-full text-left">
+    <%= render "table_head" %>
+    <tbody>
+      <%= render partial: "row", collection: @rows, as: :row %>
+    </tbody>
+  </table>
+  <p class="mt-4 text-xs text-slate-400">Based on Wikipedia categories; honorary awards count.</p>
+<% end %>

@@ -1,0 +1,23 @@
+<% content_for :title, "Cast & EGOTs" %>
+
+<div class="w-full max-w-2xl mx-auto">
+  <h1 class="text-3xl font-bold mb-1">Cast &amp; EGOTs</h1>
+  <p class="text-slate-500 mb-6">Pick a movie or a TV episode and see who in the cast has won what.</p>
+
+  <%= form_with url: cast_path, method: :get,
+        data: { controller: "search", turbo_frame: "titles" } do |f| %>
+    <%= f.search_field :q, value: @query, autofocus: true, autocomplete: "off",
+          placeholder: "Search a movie or show…",
+          data: { action: "input->search#submit" },
+          class: "w-full border border-slate-300 rounded-lg px-4 py-3 text-lg" %>
+  <% end %>
+
+  <%= turbo_frame_tag "titles", class: "mt-4 flex flex-col gap-1" do %>
+    <% @results.each do |result| %>
+      <%= render "result", result: result %>
+    <% end %>
+    <% if @query.present? && @results.empty? %>
+      <p class="p-2 text-slate-500">Nothing found for “<%= @query %>”.</p>
+    <% end %>
+  <% end %>
+</div>

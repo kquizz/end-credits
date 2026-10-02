@@ -1,0 +1,8 @@
+<% content_for :title, "#{@show[:name]} S#{@season}E#{@episode.number} cast" %>
+
+<div class="w-full max-w-4xl mx-auto">
+  <%= link_to "← #{@show[:name]}, season #{@season}", cast_season_path(params[:id], @season), class: "text-sm text-slate-500 hover:underline" %>
+  <h1 class="text-3xl font-bold mt-2"><%= @show[:name] %></h1>
+  <p class="text-slate-500">Season <%= @season %>, episode <%= @episode.number %> · <%= @episode.name %></p>
+  <%= render "table_frame", cast: @cast, table_params: @table_params %>
+</div>

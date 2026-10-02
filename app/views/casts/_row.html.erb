@@ -1,0 +1,23 @@
+<tr class="border-t border-slate-200 <%= "bg-amber-50" if row.status&.egot? %>">
+  <td class="py-2 pr-3 font-medium">
+    <% if row.wikipedia_title %>
+      <%= link_to row.member.name, "https://en.wikipedia.org/wiki/#{ERB::Util.url_encode(row.wikipedia_title.tr(" ", "_"))}",
+            target: "_blank", rel: "noopener", class: "hover:underline" %>
+    <% else %>
+      <%= row.member.name %>
+    <% end %>
+    <%= "🏆" if row.status&.egot? %>
+  </td>
+  <td class="py-2 pr-3 text-slate-500"><%= row.member.character %></td>
+  <% EgotStatus::LABELS.each_key do |key| %>
+    <td class="py-2 text-center">
+      <% if !row.matched? %>
+        <span class="font-bold text-amber-500" title="Couldn't match to a Wikipedia article">?</span>
+      <% elsif row.status.won?(key) %>
+        <span class="text-xl text-green-600" title="<%= row.status.wins(key).join("; ") %>">✓</span>
+      <% else %>
+        <span class="text-xl text-slate-300">✗</span>
+      <% end %>
+    </td>
+  <% end %>
+</tr>
