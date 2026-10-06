@@ -24,8 +24,22 @@
     <p data-costars-target="status" class="text-sm text-slate-500" role="status"></p>
   </div>
 
-  <div class="relative mt-8">
+  <div data-costars-target="controls" hidden class="mt-6 flex flex-wrap items-center gap-6">
+    <div class="inline-flex overflow-hidden rounded-lg border border-slate-300 text-sm font-medium" role="group" aria-label="View">
+      <button type="button" data-costars-target="gridBtn" data-action="costars#showGrid" aria-pressed="true"
+              class="px-3 py-1.5 bg-slate-900 text-white">Grid</button>
+      <button type="button" data-costars-target="webBtn" data-action="costars#showWeb" aria-pressed="false"
+              class="px-3 py-1.5 bg-white text-slate-700">Web</button>
+    </div>
+    <label class="flex items-center gap-2 text-sm text-slate-700">
+      <input type="checkbox" data-costars-target="hideGuests" data-action="costars#redraw" class="h-4 w-4">
+      Hide one-episode guests
+    </label>
+  </div>
+
+  <div class="relative mt-6">
     <div data-costars-target="canvas" class="flex flex-wrap items-center justify-center gap-3"></div>
+    <div data-costars-target="web" hidden class="w-full overflow-hidden rounded-lg border border-slate-200 bg-white"></div>
     <div data-costars-target="tooltip" hidden
          class="pointer-events-none fixed z-20 max-w-xs rounded-lg bg-slate-900 p-3 text-sm text-white shadow-lg"></div>
   </div>
