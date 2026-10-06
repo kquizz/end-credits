@@ -38,7 +38,7 @@ RSpec.describe TmdbClient do
   describe "#search" do
     it "keeps only movies and shows" do
       stub_tmdb("/search/multi", { results: [
-        { media_type: "movie", id: 1, title: "Heat", release_date: "1995-12-15", poster_path: "/h.jpg" },
+        { media_type: "movie", id: 1, title: "Heat", release_date: "1995-12-15", poster_path: "/h.jpg", popularity: 42.5 },
         { media_type: "tv", id: 2, name: "The Wire", first_air_date: "2002-06-02" },
         { media_type: "person", id: 3, name: "Al Pacino" }
       ] }, query: { "query" => "heat" })
@@ -47,6 +47,7 @@ RSpec.describe TmdbClient do
 
       expect(results.map(&:title)).to eq([ "Heat", "The Wire" ])
       expect(results.first.year).to eq(1995)
+      expect(results.first.popularity).to eq(42.5)
       expect(results.first.poster_url).to eq("https://image.tmdb.org/t/p/w185/h.jpg")
     end
 

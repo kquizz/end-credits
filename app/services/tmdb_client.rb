@@ -7,7 +7,7 @@ class TmdbClient
   BASE_URL = "https://api.themoviedb.org/3".freeze
   IMAGE_BASE = "https://image.tmdb.org/t/p".freeze
 
-  SearchResult = Struct.new(:media_type, :id, :title, :year, :poster_url, keyword_init: true)
+  SearchResult = Struct.new(:media_type, :id, :title, :year, :poster_url, :popularity, keyword_init: true)
   Title = Struct.new(:id, :name, :date, keyword_init: true) do
     def year = date&.year
   end
@@ -164,7 +164,8 @@ class TmdbClient
       media_type: raw["media_type"], id: raw["id"],
       title: raw["title"] || raw["name"],
       year: year_of(raw["release_date"] || raw["first_air_date"]),
-      poster_url: image_url(raw["poster_path"], "w185")
+      poster_url: image_url(raw["poster_path"], "w185"),
+      popularity: raw["popularity"]
     )
   end
 

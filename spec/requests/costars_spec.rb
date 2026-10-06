@@ -33,6 +33,23 @@ RSpec.describe "Costars", type: :request do
     end
   end
 
+  describe "GET /costars/search ordering" do
+    def tv(id, title, popularity, poster: "https://img/#{id}.jpg", year: 2009)
+      TmdbClient::SearchResult.new(media_type: "tv", id: id, title: title, year: year, poster_url: poster, popularity: popularity)
+    end
+
+    it "sorts by popularity and drops poster-less, barely popular junk" do
+      allow(tmdb).to receive(:search).with("the good wife").and_return([
+        tv(1, "The Good Wife (ru)", 3.0), tv(2, "The Trial", 0.4, poster: nil),
+        tv(3, "The Good Wife", 60.0), tv(4, "Obscure but posterless", 9.0, poster: nil)
+      ])
+
+      get costars_search_path(q: "the good wife", format: :json)
+
+      expect(response.parsed_body.map { |r| r["id"] }).to eq([ 3, 4, 1 ])
+    end
+  end
+
   describe "GET /costars/overlap" do
     it "returns the shared people" do
       allow(tmdb).to receive(:tv) { |id| { name: "Show #{id}", seasons: [] } }
