@@ -32,9 +32,12 @@
       <button type="button" data-costars-target="webBtn" data-action="costars#showWeb" aria-pressed="false"
               class="px-3 py-1.5 bg-white text-slate-700">Web</button>
     </div>
-    <label class="flex items-center gap-2 text-sm text-slate-700">
-      <input type="checkbox" data-costars-target="hideGuests" data-action="costars#redraw" class="h-4 w-4">
-      Hide one-episode guests
+    <label data-costars-target="minWrap" hidden class="flex items-center gap-2 text-sm text-slate-700">
+      Hide people with fewer than
+      <output data-costars-target="minValue" class="w-4 text-center font-semibold">1</output>
+      episodes in a show
+      <input type="range" min="1" max="1" step="1" value="1" data-costars-target="minEp" data-action="input->costars#filter"
+             class="w-40 accent-slate-900" aria-label="Minimum episodes in a single show">
     </label>
   </div>
 

@@ -7,7 +7,7 @@ const WEB_SCALE = 0.65
 
 // Series picker (search -> chips) plus the overlap bubbles. Plain DOM, no charting library.
 export default class extends Controller {
-  static targets = ["input", "results", "chips", "button", "status", "canvas", "tooltip", "controls", "gridBtn", "webBtn", "hideGuests", "web"]
+  static targets = ["input", "results", "chips", "button", "status", "canvas", "tooltip", "controls", "gridBtn", "webBtn", "minWrap", "minValue", "minEp", "web"]
   static values = { searchUrl: String, overlapUrl: String, preload: Array }
 
   connect() {
@@ -15,6 +15,7 @@ export default class extends Controller {
     this.seq = 0
     this.overlap = null
     this.view = new URLSearchParams(location.search).get("view") === "web" ? "web" : "grid"
+    this.pendingMin = parseInt(new URLSearchParams(location.search).get("min"), 10) || 1
     this.preloadValue.forEach((item) => this.series.set(item.id, item))
     this.drawChips()
     if (this.series.size >= 2) this.render()
@@ -90,6 +91,7 @@ export default class extends Controller {
   syncUrl() {
     const parts = [...this.series.keys()].map((id) => `ids[]=${id}`)
     if (this.view === "web") parts.push("view=web")
+    if (this.minEpisodes() > 1) parts.push(`min=${this.minEpisodes()}`)
     const query = this.series.size ? `?${parts.join("&")}` : ""
     history.replaceState(null, "", `${location.pathname}${query}`)
   }
@@ -119,6 +121,12 @@ export default class extends Controller {
     this.titles = Object.fromEntries(data.series.map((s) => [s.id, s.title]))
     this.overlap = data
     this.controlsTarget.hidden = data.people.length === 0
+    const top = Math.max(1, ...data.people.map((p) => this.peak(p)))
+    this.minEpTarget.max = top
+    this.minEpTarget.value = Math.min(this.pendingMin ?? this.minEpisodes(), top)
+    this.pendingMin = null
+    this.minWrapTarget.hidden = top <= 1
+    this.syncUrl()
     this.redraw()
   }
 
@@ -131,13 +139,17 @@ export default class extends Controller {
     this.redraw()
   }
 
+  filter() {
+    this.syncUrl()
+    this.redraw()
+  }
+
   // Re-renders the current view from the cached data; never refetches.
   redraw() {
     if (!this.overlap) return
     const people = this.visiblePeople()
-    this.statusTarget.textContent = people.length
-      ? `${people.length} ${people.length === 1 ? "person" : "people"} in at least 2 of these series.`
-      : (this.overlap.people.length ? "Nobody left after hiding one-episode guests." : "Nobody appears in more than one of these series.")
+    this.minValueTarget.textContent = this.minEpisodes()
+    this.statusTarget.textContent = this.statusText(people)
     const web = this.view === "web"
     this.canvasTarget.hidden = web
     this.webTarget.hidden = !web
@@ -155,10 +167,27 @@ export default class extends Controller {
     btn.setAttribute("aria-pressed", String(on))
   }
 
-  // Optionally drops people whose biggest single-show episode count is 1 (one-off guest spots only).
+  statusText(people) {
+    if (!this.overlap.people.length) return "Nobody appears in more than one of these series."
+    if (!people.length) return "Nobody left after filtering."
+    const min = this.minEpisodes()
+    const filters = min > 1 ? `, ${min}+ episodes in a show` : ""
+    return `${people.length} ${people.length === 1 ? "person" : "people"} in at least 2 of these series${filters}.`
+  }
+
+  // A person's biggest single-show episode count.
+  peak(p) {
+    return Math.max(...p.shows.map((s) => s.episodes))
+  }
+
+  minEpisodes() {
+    return this.hasMinEpTarget ? parseInt(this.minEpTarget.value, 10) || 1 : 1
+  }
+
+  // Hides people whose max episodes in any single matched show is below the slider (1 shows everyone).
   visiblePeople() {
-    if (!this.hideGuestsTarget.checked) return this.overlap.people
-    return this.overlap.people.filter((p) => Math.max(...p.shows.map((s) => s.episodes)) > 1)
+    const min = this.minEpisodes()
+    return this.overlap.people.filter((p) => this.peak(p) >= min)
   }
 
   stopWeb() {
