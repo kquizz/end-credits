@@ -8,13 +8,16 @@ const WEB_SCALE = 0.65
 // Series picker (search -> chips) plus the overlap bubbles. Plain DOM, no charting library.
 export default class extends Controller {
   static targets = ["input", "results", "chips", "button", "status", "canvas", "tooltip", "controls", "gridBtn", "webBtn", "hideGuests", "web"]
-  static values = { searchUrl: String, overlapUrl: String }
+  static values = { searchUrl: String, overlapUrl: String, preload: Array }
 
   connect() {
     this.series = new Map()
     this.seq = 0
-    this.view = "grid"
     this.overlap = null
+    this.view = new URLSearchParams(location.search).get("view") === "web" ? "web" : "grid"
+    this.preloadValue.forEach((item) => this.series.set(item.id, item))
+    this.drawChips()
+    if (this.series.size >= 2) this.render()
   }
 
   disconnect() {
@@ -80,6 +83,15 @@ export default class extends Controller {
       this.chipsTarget.append(chip)
     })
     this.buttonTarget.disabled = this.series.size < 2
+    this.syncUrl()
+  }
+
+  // Keeps the address bar copy-pasteable: /costars?ids[]=1&ids[]=2&view=web
+  syncUrl() {
+    const parts = [...this.series.keys()].map((id) => `ids[]=${id}`)
+    if (this.view === "web") parts.push("view=web")
+    const query = this.series.size ? `?${parts.join("&")}` : ""
+    history.replaceState(null, "", `${location.pathname}${query}`)
   }
 
   async render() {
@@ -115,6 +127,7 @@ export default class extends Controller {
 
   setView(view) {
     this.view = view
+    this.syncUrl()
     this.redraw()
   }
 

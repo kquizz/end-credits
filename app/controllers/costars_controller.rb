@@ -1,5 +1,6 @@
 class CostarsController < ApplicationController
   MIN_SERIES = 2
+  MAX_PRELOAD = 8
   # A search hit with no poster and less popularity than this is almost always a stub or a remake nobody watched.
   JUNK_POPULARITY = 2.0
 
@@ -11,7 +12,11 @@ class CostarsController < ApplicationController
     render json: { error: "TMDb doesn't know one of those series." }, status: :not_found
   end
 
-  def index; end
+  # `/costars?ids[]=81723&ids[]=1435` is a shareable link: the chips are filled in server-side
+  # and the page runs the overlap on load.
+  def index
+    @preloaded = Array(params[:ids]).map(&:to_i).reject(&:zero?).uniq.first(MAX_PRELOAD).filter_map { |id| preload(id) }
+  end
 
   # Series-only title search for the picker, most popular first, without poster-less stubs.
   def search
@@ -29,6 +34,13 @@ class CostarsController < ApplicationController
   end
 
   private
+
+  # A series TMDb doesn't know (or can't be reached for) is skipped rather than breaking the page.
+  def preload(id)
+    { id: id, title: tmdb.tv(id)[:name] }
+  rescue TmdbClient::Error
+    nil
+  end
 
   def junk?(result)
     result.poster_url.nil? && result.popularity && result.popularity < JUNK_POPULARITY

@@ -2,6 +2,7 @@
 
 <div class="w-full max-w-5xl mx-auto"
      data-controller="costars"
+     data-costars-preload-value="<%= (@preloaded || []).to_json %>"
      data-costars-search-url-value="<%= costars_search_path %>"
      data-costars-overlap-url-value="<%= costars_overlap_path %>">
   <%= link_to "← Home", root_path, class: "text-sm text-slate-500 hover:underline" %>

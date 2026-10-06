@@ -20,6 +20,21 @@ RSpec.describe "Costars", type: :request do
     end
   end
 
+  describe "GET /costars with ids (shareable link)" do
+    it "preloads the series titles for the picker and skips ones TMDb doesn't know" do
+      allow(tmdb).to receive(:tv).with(81723).and_return({ name: "The Gilded Age", seasons: [] })
+      allow(tmdb).to receive(:tv).with(1435).and_return({ name: "The Good Wife", seasons: [] })
+      allow(tmdb).to receive(:tv).with(999).and_raise(TmdbClient::NotFound)
+
+      get costars_path(ids: [ 81723, 1435, 999, "junk" ])
+
+      expect(response).to have_http_status(:ok)
+      preload = Nokogiri::HTML(response.body).at_css("[data-controller=costars]")["data-costars-preload-value"]
+      expect(JSON.parse(preload)).to eq([ { "id" => 81723, "title" => "The Gilded Age" },
+                                          { "id" => 1435, "title" => "The Good Wife" } ])
+    end
+  end
+
   describe "GET /costars/search" do
     it "returns only TV results" do
       allow(tmdb).to receive(:search).with("gild").and_return([
