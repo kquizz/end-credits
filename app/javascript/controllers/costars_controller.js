@@ -7,7 +7,7 @@ const WEB_SCALE = 0.65
 
 // Series picker (search -> chips) plus the overlap bubbles. Plain DOM, no charting library.
 export default class extends Controller {
-  static targets = ["input", "results", "chips", "button", "status", "canvas", "tooltip", "controls", "gridBtn", "webBtn", "minWrap", "minValue", "minEp", "web"]
+  static targets = ["input", "results", "chips", "button", "status", "canvas", "tooltip", "controls", "gridBtn", "webBtn", "allWrap", "allShows", "minWrap", "minValue", "minEp", "web"]
   static values = { searchUrl: String, overlapUrl: String, preload: Array }
 
   connect() {
@@ -16,6 +16,7 @@ export default class extends Controller {
     this.overlap = null
     this.view = new URLSearchParams(location.search).get("view") === "web" ? "web" : "grid"
     this.pendingMin = parseInt(new URLSearchParams(location.search).get("min"), 10) || 1
+    this.pendingAll = new URLSearchParams(location.search).get("all") === "1"
     this.preloadValue.forEach((item) => this.series.set(item.id, item))
     this.drawChips()
     if (this.series.size >= 2) this.render()
@@ -91,6 +92,7 @@ export default class extends Controller {
   syncUrl() {
     const parts = [...this.series.keys()].map((id) => `ids[]=${id}`)
     if (this.view === "web") parts.push("view=web")
+    if (this.allRequired()) parts.push("all=1")
     if (this.minEpisodes() > 1) parts.push(`min=${this.minEpisodes()}`)
     const query = this.series.size ? `?${parts.join("&")}` : ""
     history.replaceState(null, "", `${location.pathname}${query}`)
@@ -125,6 +127,10 @@ export default class extends Controller {
     this.minEpTarget.max = top
     this.minEpTarget.value = Math.min(this.pendingMin ?? this.minEpisodes(), top)
     this.pendingMin = null
+    const many = data.series.length >= 3
+    this.allWrapTarget.hidden = !many
+    this.allShowsTarget.checked = many && (this.pendingAll ?? this.allShowsTarget.checked)
+    this.pendingAll = null
     this.minWrapTarget.hidden = top <= 1
     this.syncUrl()
     this.redraw()
@@ -172,7 +178,8 @@ export default class extends Controller {
     if (!people.length) return "Nobody left after filtering."
     const min = this.minEpisodes()
     const filters = min > 1 ? `, ${min}+ episodes in a show` : ""
-    return `${people.length} ${people.length === 1 ? "person" : "people"} in at least 2 of these series${filters}.`
+    const scope = this.allRequired() ? `all ${this.overlap.series.length}` : "at least 2"
+    return `${people.length} ${people.length === 1 ? "person" : "people"} in ${scope} of these series${filters}.`
   }
 
   // A person's biggest single-show episode count.
@@ -184,10 +191,16 @@ export default class extends Controller {
     return this.hasMinEpTarget ? parseInt(this.minEpTarget.value, 10) || 1 : 1
   }
 
-  // Hides people whose max episodes in any single matched show is below the slider (1 shows everyone).
+  allRequired() {
+    return this.hasAllShowsTarget && !this.allWrapTarget.hidden && this.allShowsTarget.checked
+  }
+
+  // Combines the slider (max episodes in any single matched show must reach it; 1 shows everyone)
+  // with the optional "in every selected show" check.
   visiblePeople() {
     const min = this.minEpisodes()
-    return this.overlap.people.filter((p) => this.peak(p) >= min)
+    const everyShow = this.allRequired() ? this.overlap.series.length : 0
+    return this.overlap.people.filter((p) => this.peak(p) >= min && p.shows.length >= everyShow)
   }
 
   stopWeb() {

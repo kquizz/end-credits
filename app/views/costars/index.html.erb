@@ -32,6 +32,10 @@
       <button type="button" data-costars-target="webBtn" data-action="costars#showWeb" aria-pressed="false"
               class="px-3 py-1.5 bg-white text-slate-700">Web</button>
     </div>
+    <label data-costars-target="allWrap" hidden class="flex items-center gap-2 text-sm text-slate-700">
+      <input type="checkbox" data-costars-target="allShows" data-action="costars#filter" class="h-4 w-4">
+      Only people in every selected show
+    </label>
     <label data-costars-target="minWrap" hidden class="flex items-center gap-2 text-sm text-slate-700">
       Hide people with fewer than
       <output data-costars-target="minValue" class="w-4 text-center font-semibold">1</output>
