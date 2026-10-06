@@ -5,11 +5,47 @@
 
 ## Summary
 
+There are two flows. The **primary flow** is series overlap: pick two or more
+TV series and see everyone who appeared in at least two of them. The
+**secondary flow** (below, "Single-episode pool") starts from one movie or
+episode and draws a force graph.
+
+## Primary flow: pick 2+ series, show the overlap
+
+1. The user searches TV series and adds two or more as chips.
+2. For each series, one call to `/tv/{id}/aggregate_credits`
+   (`TmdbClient#tv_aggregate_credits`, cached 30 days). It returns every cast
+   member with `total_episode_count` and per-role `episode_count`.
+3. `CostarWeb` joins the casts by person id. **No per-person lookups.** Cost is
+   one call per series, however long the series run.
+4. A person is kept only if they appear in at least 2 selected series
+   (`min_series`, default 2). **People who match fewer are dropped entirely.**
+5. `total_episodes` is the sum of their episode counts across the series they
+   matched in; episodes in unmatched series do not count.
+6. `size = sqrt(total_episodes) / sqrt(max total_episodes)`, so the biggest
+   match in the current result is 1.0 and a 156-episode lead does not dwarf a
+   one-episode cameo. People are sorted by `total_episodes` descending.
+7. The page draws circular profile photos (48-180px by `size`), with an
+   initials circle when TMDb has no photo. Hover or click shows each series,
+   the episode count and the character names.
+
+Real example, verified against TMDb: *The Gilded Age* (81723) with *The Good
+Wife* (1435) gives **43 shared people**. Christine Baranski leads (33 + 156
+episodes), then Nathan Lane (13 + 15), Audra McDonald (17 + 1) and so on.
+
+Endpoints: `GET /costars` (page), `GET /costars/search.json?q=` (TV title
+search for the picker), `GET /costars/overlap.json?ids[]=81723&ids[]=1435`.
+
+**Limit:** this is series-level overlap. It says two shows share a person and
+for how many episodes, not that two people shared an episode.
+
+## Secondary flow: single-episode pool
+
 Pick a movie or a TV episode. See which of its cast have worked together on
 *other* things, drawn as a D3 force graph. Add more titles to see how they
 connect to the same people.
 
-## Core idea: look up people, not titles
+### Core idea: look up people, not titles
 
 Ignore TV shows' own cast lists. A 400-episode series has thousands of guest
 stars; fetching them is the expensive, unbounded part. Instead:
