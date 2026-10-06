@@ -16,6 +16,8 @@ class TmdbClient
   Season = Struct.new(:number, :name, :episode_count, keyword_init: true)
   Episode = Struct.new(:number, :name, :date, keyword_init: true)
   CastMember = Struct.new(:person_id, :name, :character, :photo_url, keyword_init: true)
+  # One person's whole run on a series: roles is [{ character:, episode_count: }].
+  AggregateCastMember = Struct.new(:person_id, :name, :photo_url, :total_episodes, :roles, keyword_init: true)
   Credit = Struct.new(:media_type, :id, :title, :year, :character, :genre_ids, keyword_init: true)
 
   def initialize(token: Rails.application.config.tmdb_api_token, cache: Rails.cache)
@@ -76,6 +78,17 @@ class TmdbClient
   def episode_cast(tv_id, season_number, episode_number)
     raw = get("/tv/#{tv_id}/season/#{season_number}/episode/#{episode_number}/credits")
     build_cast("cast" => Array(raw["cast"]) + Array(raw["guest_stars"]))
+  end
+
+  # Everyone who ever appeared in a series, with episode counts, in a single request.
+  def tv_aggregate_credits(id)
+    Array(get("/tv/#{id}/aggregate_credits")["cast"]).map do |m|
+      AggregateCastMember.new(
+        person_id: m["id"], name: m["name"], photo_url: image_url(m["profile_path"], "w185"),
+        total_episodes: m["total_episode_count"].to_i,
+        roles: Array(m["roles"]).map { |r| { character: r["character"], episode_count: r["episode_count"].to_i } }
+      )
+    end
   end
 
   def person_details(person_id)

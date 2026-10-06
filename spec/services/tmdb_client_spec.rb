@@ -174,4 +174,34 @@ RSpec.describe TmdbClient do
       expect(client.person_imdb_ids([])).to eq({})
     end
   end
+
+  describe "#tv_aggregate_credits" do
+    let(:body) do
+      { cast: [ { id: 5, name: "Christine Baranski", profile_path: "/c.jpg", total_episode_count: 189,
+                  roles: [ { character: "Diane Lockhart", episode_count: 156 }, { character: "Diane", episode_count: 33 } ] },
+                { id: 6, name: "No Photo", profile_path: nil, total_episode_count: 1, roles: [] } ] }
+    end
+
+    it "parses each cast member with episode counts and roles" do
+      stub_tmdb("/tv/1435/aggregate_credits", body)
+
+      first, second = client.tv_aggregate_credits(1435)
+
+      expect(first.person_id).to eq(5)
+      expect(first.total_episodes).to eq(189)
+      expect(first.photo_url).to eq("https://image.tmdb.org/t/p/w185/c.jpg")
+      expect(first.roles).to eq([ { character: "Diane Lockhart", episode_count: 156 }, { character: "Diane", episode_count: 33 } ])
+      expect(second.photo_url).to be_nil
+    end
+
+    it "caches the response" do
+      cache = ActiveSupport::Cache::MemoryStore.new
+      stub = stub_tmdb("/tv/1435/aggregate_credits", body)
+      cached = described_class.new(token: "eyJ-test", cache: cache)
+
+      2.times { cached.tv_aggregate_credits(1435) }
+
+      expect(stub).to have_been_requested.once
+    end
+  end
 end
