@@ -7,13 +7,14 @@ const WEB_SCALE = 0.65
 
 // Series picker (search -> chips) plus the overlap bubbles. Plain DOM, no charting library.
 export default class extends Controller {
-  static targets = ["input", "results", "chips", "button", "status", "canvas", "tooltip", "controls", "gridBtn", "webBtn", "allWrap", "allShows", "minWrap", "minValue", "minEp", "web"]
+  static targets = ["input", "results", "chips", "button", "status", "canvas", "tooltip", "detail", "controls", "gridBtn", "webBtn", "allWrap", "allShows", "minWrap", "minValue", "minEp", "web"]
   static values = { searchUrl: String, overlapUrl: String, preload: Array }
 
   connect() {
     this.series = new Map()
     this.seq = 0
     this.overlap = null
+    this.selectedId = null
     this.view = new URLSearchParams(location.search).get("view") === "web" ? "web" : "grid"
     this.pendingMin = parseInt(new URLSearchParams(location.search).get("min"), 10) || 1
     this.pendingAll = new URLSearchParams(location.search).get("all") === "1"
@@ -104,6 +105,7 @@ export default class extends Controller {
     ids.forEach((id) => params.append("ids[]", id))
     this.canvasTarget.replaceChildren()
     this.stopWeb()
+    this.clearSelection()
     this.controlsTarget.hidden = true
     this.statusTarget.textContent = "Looking for shared cast…"
     this.buttonTarget.disabled = true
@@ -166,6 +168,64 @@ export default class extends Controller {
     this.tooltipTarget.hidden = true
     if (web) this.drawWeb(people)
     else people.forEach((p) => this.canvasTarget.append(this.bubble(p)))
+    const selected = people.find((p) => p.id === this.selectedId)
+    if (selected) this.select(selected)
+    else this.clearSelection()
+  }
+
+  select(p) {
+    this.selectedId = p.id
+    this.tooltipTarget.hidden = true
+    this.showDetail(p)
+    this.highlight()
+  }
+
+  clearSelection() {
+    this.selectedId = null
+    this.detailTarget.hidden = true
+    this.highlight()
+  }
+
+  showDetail(p) {
+    const panel = this.detailTarget
+    const close = this.el("button", "absolute right-2 top-2 rounded-full px-2 text-slate-500 hover:bg-slate-100", "×")
+    close.type = "button"
+    close.setAttribute("aria-label", "Close details")
+    close.addEventListener("click", () => this.clearSelection())
+    const head = this.el("div", "flex items-center gap-3 pr-6")
+    const photo = p.photo_url ? this.el("img", "h-16 w-16 rounded-full object-cover") : this.el("div", "flex h-16 w-16 items-center justify-center rounded-full bg-slate-200 font-semibold text-slate-600", this.initials(p.name))
+    if (p.photo_url) { photo.src = p.photo_url; photo.alt = "" }
+    head.append(photo, this.el("div", "font-semibold", p.name))
+    panel.replaceChildren(close, head, this.el("div", "mt-2 text-sm text-slate-500", `${p.total_episodes} episodes across these series`))
+    p.shows.forEach((s) => {
+      const row = this.el("div", "mt-2 text-sm")
+      row.append(this.el("div", "font-medium", this.titles[s.series_id]),
+                 this.el("div", "text-slate-600", `${s.characters.join(" / ") || "Unknown role"} · ${s.episodes} ep`))
+      panel.append(row)
+    })
+    const link = this.el("a", "mt-3 inline-block text-sm text-blue-600 hover:underline", "View on TMDb")
+    link.href = `https://www.themoviedb.org/person/${p.id}`
+    link.target = "_blank"
+    link.rel = "noopener"
+    panel.append(link)
+    panel.hidden = false
+  }
+
+  // Grid: ring the chosen bubble. Web: keep the person's links and hubs bright, dim everything else.
+  highlight() {
+    const id = this.selectedId
+    this.canvasTarget.querySelectorAll("[data-person-id]").forEach((el) => {
+      el.firstChild.style.outline = el.dataset.personId === String(id) ? "3px solid #0f172a" : ""
+    })
+    const w = this.webParts
+    if (!w) return
+    const on = id !== null
+    const mine = (l) => on && l.source.p?.id === id
+    const hubOn = new Set(w.links.filter(mine).map((l) => l.target.id))
+    w.link.attr("stroke", (l) => (mine(l) ? "#0f172a" : "#cbd5e1")).attr("stroke-width", (l) => (mine(l) ? 3 : 1.5))
+      .attr("stroke-opacity", (l) => (!on || mine(l) ? 0.9 : 0.1))
+    w.hubSel.attr("opacity", (h) => (!on || hubOn.has(h.id) ? 1 : 0.25))
+    w.personSel.attr("opacity", (n) => (!on || n.p.id === id ? 1 : 0.25))
   }
 
   styleToggle(btn, on) {
@@ -206,6 +266,7 @@ export default class extends Controller {
   stopWeb() {
     this.simulation?.stop()
     this.simulation = null
+    this.webParts = null
     this.webTarget.replaceChildren()
   }
 
@@ -237,7 +298,7 @@ export default class extends Controller {
 
     const svg = d3.select(this.webTarget).append("svg")
       .attr("viewBox", `0 0 ${width} ${height}`).attr("width", width).attr("height", height)
-      .style("display", "block")
+      .style("display", "block").on("click", () => this.clearSelection())
     const defs = svg.append("defs")
     nodes.forEach((n) => defs.append("clipPath").attr("id", `clip-${n.id}`)
       .append("circle").attr("r", n.r))
@@ -276,7 +337,8 @@ export default class extends Controller {
           .attr("font-weight", 600).attr("fill", "#0f172a").style("pointer-events", "none")
           .style("paint-order", "stroke").attr("stroke", "#fff").attr("stroke-width", 3).text(label)
       }
-      g.on("mouseenter", (e) => this.showTip(n.p, e))
+      g.on("click", (e) => { e.stopPropagation(); this.select(n.p) })
+        .on("mouseenter", (e) => this.showTip(n.p, e))
         .on("mousemove", (e) => this.moveTip(e))
         .on("mouseleave", () => (this.tooltipTarget.hidden = true))
     })
@@ -298,6 +360,7 @@ export default class extends Controller {
         personSel.attr("transform", (d) => `translate(${d.x},${d.y})`)
       })
     this.simulation = sim
+    this.webParts = { link, hubSel, personSel, links }
 
     personSel.call(d3.drag()
       .on("start", (e, d) => { this.tooltipTarget.hidden = true; if (!e.active) sim.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y })
@@ -332,12 +395,15 @@ export default class extends Controller {
     wrap.append(face, label)
     if (label.textContent !== p.name) wrap.append(this.el("span", "text-xs leading-tight text-slate-500", p.name))
     wrap.tabIndex = 0
+    wrap.dataset.personId = p.id
+    wrap.style.cursor = "pointer"
     wrap.addEventListener("mouseenter", (e) => this.showTip(p, e))
     wrap.addEventListener("mousemove", (e) => this.moveTip(e))
     wrap.addEventListener("mouseleave", () => (this.tooltipTarget.hidden = true))
     wrap.addEventListener("focus", () => this.showTip(p, wrap.getBoundingClientRect()))
     wrap.addEventListener("blur", () => (this.tooltipTarget.hidden = true))
-    wrap.addEventListener("click", (e) => this.showTip(p, e))
+    wrap.addEventListener("click", () => this.select(p))
+    wrap.addEventListener("keydown", (e) => { if (e.key === "Enter") this.select(p) })
     return wrap
   }
 

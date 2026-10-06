@@ -126,4 +126,13 @@ Shared with the Six Degrees game so the logic lives in one place
 
 - Same-episode detection.
 - Crew (directors, writers): cast only.
-- Saving or sharing a web.
+
+## Follow-ups shipped
+
+- Shareable links: `/costars?ids[]=81723&ids[]=1435[&view=web][&min=2][&all=1]` preloads the chips
+  server-side and runs the overlap on load; the address bar is kept in sync with `history.replaceState`.
+- Filters (client-side, no refetch): a minimum-episodes slider (hide a person whose max episodes in any
+  single matched show is below N; default 1) and, with 3+ series, "Only people in every selected show".
+- Clicking a person opens a detail panel (characters per show, TMDb link); in the web view it also
+  highlights that person's links and hubs and dims the rest.
+- Picker results are sorted by TMDb popularity, dropping poster-less, barely popular stubs.
