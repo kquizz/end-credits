@@ -7,13 +7,15 @@ const WEB_SCALE = 0.65
 
 // Series picker (search -> chips) plus the overlap bubbles. Plain DOM, no charting library.
 export default class extends Controller {
-  static targets = ["input", "results", "chips", "button", "status", "canvas", "tooltip", "detail", "controls", "gridBtn", "webBtn", "allWrap", "allShows", "minWrap", "minValue", "minEp", "web"]
-  static values = { searchUrl: String, overlapUrl: String, preload: Array }
+  static targets = ["input", "results", "chips", "button", "status", "canvas", "tooltip", "detail", "controls", "gridBtn", "webBtn", "allWrap", "allShows", "minWrap", "minValue", "minEp", "web", "watchSection", "watchBtn", "watchStatus", "watchList", "skipSelf", "skipVoice", "skipMarvel"]
+  static values = { searchUrl: String, overlapUrl: String, watchNextUrl: String, preload: Array }
 
   connect() {
     this.series = new Map()
     this.seq = 0
     this.overlap = null
+    this.watchSeq = 0
+    this.watchLoaded = false
     this.selectedId = null
     this.view = new URLSearchParams(location.search).get("view") === "web" ? "web" : "grid"
     this.pendingMin = parseInt(new URLSearchParams(location.search).get("min"), 10) || 1
@@ -107,6 +109,8 @@ export default class extends Controller {
     this.stopWeb()
     this.clearSelection()
     this.controlsTarget.hidden = true
+    this.resetWatch()
+    this.watchSectionTarget.hidden = true
     this.statusTarget.textContent = "Looking for shared cast…"
     this.buttonTarget.disabled = true
     try {
@@ -125,6 +129,7 @@ export default class extends Controller {
     this.titles = Object.fromEntries(data.series.map((s) => [s.id, s.title]))
     this.overlap = data
     this.controlsTarget.hidden = data.people.length === 0
+    this.watchSectionTarget.hidden = data.people.length < 2
     const top = Math.max(1, ...data.people.map((p) => this.peak(p)))
     this.minEpTarget.max = top
     this.minEpTarget.value = Math.min(this.pendingMin ?? this.minEpisodes(), top)
@@ -149,7 +154,88 @@ export default class extends Controller {
 
   filter() {
     this.syncUrl()
+    this.resetWatch()
     this.redraw()
+  }
+
+  // Watch-next is fetched on demand: one cached credits lookup per visible person (up to 60).
+  async loadWatchNext() {
+    const people = this.visiblePeople()
+    if (people.length < 2) return
+    const params = new URLSearchParams()
+    people.forEach((p) => params.append("ids[]", p.id))
+    this.overlap.series.forEach((s) => params.append("series[]", s.id))
+    params.set("skip_self", this.skipSelfTarget.checked ? "1" : "0")
+    params.set("skip_voice", this.skipVoiceTarget.checked ? "1" : "0")
+    params.set("skip_marvel", this.skipMarvelTarget.checked ? "1" : "0")
+    const seq = ++this.watchSeq
+    this.watchBtnTarget.disabled = true
+    this.watchListTarget.replaceChildren()
+    this.watchStatusTarget.textContent = `Checking what ${Math.min(people.length, 60)} people have been in… the first time can take a few seconds.`
+    try {
+      const res = await fetch(`${this.watchNextUrlValue}?${params}`, { headers: { Accept: "application/json" } })
+      const data = await res.json()
+      if (seq !== this.watchSeq) return
+      if (!res.ok) throw new Error(data.error || "Something went wrong.")
+      this.watchLoaded = true
+      this.drawWatchNext(data)
+    } catch (e) {
+      if (seq !== this.watchSeq) return
+      this.watchStatusTarget.textContent = e.message
+    } finally {
+      if (seq === this.watchSeq) this.watchBtnTarget.disabled = false
+    }
+  }
+
+  // A toggle changes which credits count, so re-ask the server (cached, so quick) if results are showing.
+  watchFilter() {
+    if (this.watchLoaded) this.loadWatchNext()
+  }
+
+  // The overlap filters changed, so any list on screen is for a different set of people.
+  resetWatch() {
+    this.watchSeq++
+    this.watchLoaded = false
+    this.watchListTarget.replaceChildren()
+    this.watchStatusTarget.textContent = ""
+    this.watchBtnTarget.disabled = false
+  }
+
+  drawWatchNext(data) {
+    const byId = new Map(this.overlap.people.map((p) => [p.id, p]))
+    this.watchListTarget.replaceChildren()
+    if (!data.titles.length) {
+      this.watchStatusTarget.textContent = "Nothing else is shared by two or more of these people under these filters."
+      return
+    }
+    const skipped = data.people_skipped ? ` (${data.people_skipped} couldn't be checked)` : ""
+    this.watchStatusTarget.textContent = `${data.titles.length} titles from ${data.people_checked} people${skipped}.`
+    data.titles.forEach((t) => this.watchListTarget.append(this.watchRow(t, t.person_ids.map((id) => byId.get(id)).filter(Boolean))))
+  }
+
+  watchRow(t, people) {
+    const row = this.el("li", "flex items-center gap-3")
+    const info = this.el("div", "min-w-0 flex-1")
+    const kind = t.media_type === "tv" ? "TV" : "Movie"
+    const link = this.el("a", "font-medium text-blue-700 hover:underline", t.title)
+    link.href = `https://www.themoviedb.org/${t.media_type}/${t.id}`
+    link.target = "_blank"
+    link.rel = "noopener"
+    info.append(link,
+      this.el("div", "text-sm text-slate-500", [t.year, kind, t.total_episodes > 0 ? `${t.total_episodes} episodes combined` : null].filter(Boolean).join(" · ")),
+      this.el("div", "text-sm text-slate-700", `${t.member_count} of these people`))
+    const stack = this.el("div", "hidden shrink-0 -space-x-2 sm:flex")
+    stack.title = people.map((p) => p.name).join(", ")
+    people.slice(0, 6).forEach((p) => {
+      const face = p.photo_url ? this.el("img", "h-9 w-9 rounded-full border-2 border-white object-cover") : this.el("div", "flex h-9 w-9 items-center justify-center rounded-full border-2 border-white bg-slate-200 text-xs font-semibold text-slate-600", this.initials(p.name))
+      if (p.photo_url) { face.src = p.photo_url; face.alt = ""; face.loading = "lazy" }
+      face.title = p.name
+      stack.append(face)
+    })
+    if (people.length > 6) stack.append(this.el("div", "flex h-9 w-9 items-center justify-center rounded-full border-2 border-white bg-slate-100 text-xs font-medium text-slate-600", `+${people.length - 6}`))
+    row.append(this.poster(t.poster_url), info, stack)
+    row.querySelector("img, div")?.classList.add("shrink-0")
+    return row
   }
 
   // Re-renders the current view from the cached data; never refetches.

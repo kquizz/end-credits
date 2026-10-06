@@ -33,7 +33,25 @@ class CostarsController < ApplicationController
     render json: CostarWeb.new(tmdb: tmdb).call(ids)
   end
 
+  # Titles several of the given people (best-first) share. Lazy on purpose: one cached credits
+  # lookup per person, so the page only calls it when asked.
+  def watch_next
+    people = int_ids(params[:ids])
+    if people.size < WatchNext::MIN_PEOPLE
+      return render json: { error: "Need at least #{WatchNext::MIN_PEOPLE} people." }, status: :unprocessable_content
+    end
+
+    render json: WatchNext.new(tmdb: tmdb, skip_self: flag(:skip_self, true), skip_voice: flag(:skip_voice, true),
+                               skip_marvel: flag(:skip_marvel, false)).call(people, series_ids: int_ids(params[:series]))
+  end
+
   private
+
+  def int_ids(value) = Array(value).map(&:to_i).reject(&:zero?).uniq
+
+  def flag(name, default)
+    params.key?(name) ? ActiveModel::Type::Boolean.new.cast(params[name]) : default
+  end
 
   # A series TMDb doesn't know (or can't be reached for) is skipped rather than breaking the page.
   def preload(id)

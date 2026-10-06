@@ -136,3 +136,7 @@ Shared with the Six Degrees game so the logic lives in one place
 - Clicking a person opens a detail panel (characters per show, TMDb link); in the web view it also
   highlights that person's links and hubs and dims the rest.
 - Picker results are sorted by TMDb popularity, dropping poster-less, barely popular stubs.
+- Watch next: a lazy "Watch next" section under the results (`GET /costars/watch_next.json?ids[]=<people>&series[]=<selected>&skip_self=&skip_voice=&skip_marvel=`).
+  `WatchNext` fetches each visible person's credits (first 60, cached), applies `CreditFilter`, and lists up to 25 other titles shared
+  by 2+ of them, ranked by member count, combined episodes, popularity, recency. The min-episodes slider and all-shows filter decide
+  which people are sent. `MarvelTitles` builds the Marvel set from `/discover` (companies 420 and 38679, MCU keyword 180547).

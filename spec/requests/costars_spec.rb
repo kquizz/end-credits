@@ -104,4 +104,57 @@ RSpec.describe "Costars", type: :request do
       expect(response.parsed_body["error"]).to include("TMDb")
     end
   end
+
+  describe "GET /costars/watch_next" do
+    def credit(id, title, character: "Role")
+      TmdbClient::Credit.new(media_type: "tv", id: id, title: title, year: 2015, character: character,
+                             genre_ids: [], episode_count: 3, poster_url: "p", popularity: 1.0)
+    end
+
+    it "returns titles shared by the given people, minus the selected series" do
+      allow(tmdb).to receive(:people_credits).with([ 10, 11 ]).and_return(
+        10 => [ credit(500, "Shared"), credit(1, "Picked"), credit(600, "Talk", character: "Self") ],
+        11 => [ credit(500, "Shared"), credit(1, "Picked"), credit(600, "Talk", character: "Self") ]
+      )
+
+      get costars_watch_next_path(ids: [ 10, 11 ], series: [ 1 ], format: :json)
+
+      body = response.parsed_body
+      expect(response).to have_http_status(:ok)
+      expect(body["titles"].map { |t| [ t["title"], t["member_count"], t["person_ids"] ] }).to eq([ [ "Shared", 2, [ 10, 11 ] ] ])
+      expect(body).to include("people_checked" => 2, "people_skipped" => 0)
+    end
+
+    it "honors the filter toggles" do
+      allow(tmdb).to receive(:people_credits).and_return(
+        10 => [ credit(600, "Talk", character: "Self") ], 11 => [ credit(600, "Talk", character: "Self") ]
+      )
+
+      get costars_watch_next_path(ids: [ 10, 11 ], skip_self: "0", format: :json)
+
+      expect(response.parsed_body["titles"].map { |t| t["title"] }).to eq([ "Talk" ])
+    end
+
+    it "asks for at least two people" do
+      get costars_watch_next_path(ids: [ 10 ], format: :json)
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response.parsed_body["error"]).to include("at least 2")
+    end
+
+    it "gives a friendly message when TMDb fails" do
+      allow(tmdb).to receive(:people_credits).and_raise(TmdbClient::Error)
+
+      get costars_watch_next_path(ids: [ 10, 11 ], format: :json)
+
+      expect(response).to have_http_status(:bad_gateway)
+      expect(response.parsed_body["error"]).to include("TMDb")
+    end
+  end
+
+  it "renders the watch-next hooks on the page" do
+    get costars_path
+
+    expect(response.body).to include(costars_watch_next_path)
+  end
 end

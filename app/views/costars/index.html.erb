@@ -4,7 +4,8 @@
      data-controller="costars"
      data-costars-preload-value="<%= (@preloaded || []).to_json %>"
      data-costars-search-url-value="<%= costars_search_path %>"
-     data-costars-overlap-url-value="<%= costars_overlap_path %>">
+     data-costars-overlap-url-value="<%= costars_overlap_path %>"
+     data-costars-watch-next-url-value="<%= costars_watch_next_path %>">
   <%= link_to "← Home", root_path, class: "text-sm text-slate-500 hover:underline" %>
   <h1 class="text-3xl font-bold mt-2 mb-1">Co-star Web</h1>
   <p class="text-slate-500 mb-6">Pick two or more TV series and see who appeared in more than one. Bigger photo, more episodes together.</p>
@@ -53,4 +54,29 @@
     <div data-costars-target="tooltip" hidden
          class="pointer-events-none fixed z-20 max-w-xs rounded-lg bg-slate-900 p-3 text-sm text-white shadow-lg"></div>
   </div>
+
+  <details data-costars-target="watchSection" hidden class="mt-8 rounded-xl border border-slate-200 bg-white p-4">
+    <summary class="cursor-pointer text-lg font-semibold">Watch next</summary>
+    <p class="mt-2 text-sm text-slate-500">Other movies and shows that at least two of the people above have been in.</p>
+    <div class="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-slate-700">
+      <label class="flex items-center gap-2">
+        <input type="checkbox" checked data-costars-target="skipSelf" data-action="costars#watchFilter" class="h-4 w-4">
+        Skip talk shows / Self credits
+      </label>
+      <label class="flex items-center gap-2">
+        <input type="checkbox" checked data-costars-target="skipVoice" data-action="costars#watchFilter" class="h-4 w-4">
+        Skip voice acting
+      </label>
+      <label class="flex items-center gap-2">
+        <input type="checkbox" data-costars-target="skipMarvel" data-action="costars#watchFilter" class="h-4 w-4">
+        Skip Marvel
+      </label>
+    </div>
+    <div class="mt-3 flex items-center gap-3">
+      <button type="button" data-costars-target="watchBtn" data-action="costars#loadWatchNext"
+              class="rounded-lg bg-slate-900 px-4 py-2 font-medium text-white disabled:opacity-40">Show watch-next</button>
+      <p data-costars-target="watchStatus" class="text-sm text-slate-500" role="status"></p>
+    </div>
+    <ol data-costars-target="watchList" class="mt-4 flex flex-col gap-3"></ol>
+  </details>
 </div>

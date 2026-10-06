@@ -15,6 +15,7 @@ Rails.application.routes.draw do
   get "costars", to: "costars#index", as: :costars
   get "costars/search", to: "costars#search", as: :costars_search, defaults: { format: :json }
   get "costars/overlap", to: "costars#overlap", as: :costars_overlap, defaults: { format: :json }
+  get "costars/watch_next", to: "costars#watch_next", as: :costars_watch_next, defaults: { format: :json }
 
   # The EGOT table and the ages table share the same pickers; `tool` picks the table.
   { "cast" => "egot", "ages" => "ages" }.each do |prefix, tool|
