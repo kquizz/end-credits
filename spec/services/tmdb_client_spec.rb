@@ -102,6 +102,43 @@ RSpec.describe TmdbClient do
     end
   end
 
+  describe "#person_credits extras" do
+    it "passes through episode count, poster and popularity" do
+      stub_tmdb("/person/6/combined_credits", { cast: [
+        { media_type: "tv", id: 2, name: "Show", first_air_date: "2010-01-01", character: "X",
+          episode_count: 12, poster_path: "/p.jpg", popularity: 4.5 },
+        { media_type: "movie", id: 3, title: "Film", release_date: "2001-01-01", character: "Y" }
+      ] })
+
+      show, film = client.person_credits(6)
+
+      expect(show).to have_attributes(episode_count: 12, poster_url: "https://image.tmdb.org/t/p/w185/p.jpg", popularity: 4.5)
+      expect(film).to have_attributes(episode_count: nil, poster_url: nil)
+    end
+  end
+
+  describe "#people_credits" do
+    it "fans out and gives nil for a person TMDb fails on" do
+      stub_tmdb("/person/7/combined_credits", { cast: [ { media_type: "movie", id: 1, title: "A" } ] })
+      stub_request(:get, "https://api.themoviedb.org/3/person/8/combined_credits").to_return(status: 500)
+
+      result = client.people_credits([ 7, 8, 7 ])
+
+      expect(result.keys).to eq([ 7, 8 ])
+      expect(result[7].map(&:title)).to eq([ "A" ])
+      expect(result[8]).to be_nil
+    end
+  end
+
+  describe "#discover_ids" do
+    it "walks every page of a discover query" do
+      stub_tmdb("/discover/movie", { results: [ { id: 1 }, { id: 2 } ], total_pages: 2 }, query: { "with_companies" => "420", "page" => "1" })
+      stub_tmdb("/discover/movie", { results: [ { id: 3 } ], total_pages: 2 }, query: { "with_companies" => "420", "page" => "2" })
+
+      expect(client.discover_ids("movie", with_companies: 420)).to eq([ 1, 2, 3 ])
+    end
+  end
+
   describe "#tv" do
     it "lists seasons without specials" do
       stub_tmdb("/tv/9", { name: "Show", seasons: [

@@ -18,7 +18,9 @@ class TmdbClient
   CastMember = Struct.new(:person_id, :name, :character, :photo_url, keyword_init: true)
   # One person's whole run on a series: roles is [{ character:, episode_count: }].
   AggregateCastMember = Struct.new(:person_id, :name, :photo_url, :total_episodes, :roles, keyword_init: true)
-  Credit = Struct.new(:media_type, :id, :title, :year, :character, :genre_ids, keyword_init: true)
+  # episode_count is TV only (nil for movies); popularity and poster_url are TMDb's, for ranking and thumbnails.
+  Credit = Struct.new(:media_type, :id, :title, :year, :character, :genre_ids,
+                      :episode_count, :poster_url, :popularity, keyword_init: true)
 
   def initialize(token: Rails.application.config.tmdb_api_token, cache: Rails.cache)
     @token = token
@@ -100,31 +102,7 @@ class TmdbClient
   # { person_id => PersonDetails or nil }. Cold lookups are one request per person, so fan out; a
   # person TMDb fails on gets nil (and is retried next time, since failures are not cached).
   def people_details(person_ids, concurrency: 8)
-    ids = person_ids.uniq
-    return {} if ids.empty?
-
-    connection # build the connection once, before the threads race to create it
-    queue = Queue.new.tap { |q| ids.each { |id| q << id } }
-    results = {}
-    lock = Mutex.new
-
-    Array.new([ concurrency, ids.size ].min) do
-      Thread.new do
-        Rails.application.executor.wrap do
-          while (id = next_from(queue))
-            details = begin
-              person_details(id)
-            rescue Error, Faraday::Error => e
-              Rails.logger.warn("TMDb person #{id} lookup failed: #{e.message}")
-              nil
-            end
-            lock.synchronize { results[id] = details }
-          end
-        end
-      end
-    end.each(&:join)
-
-    ids.to_h { |id| [ id, results[id] ] }
+    fan_out(person_ids, "person", concurrency) { |id| person_details(id) }
   end
 
   # { person_id => imdb_id or nil }
@@ -139,12 +117,63 @@ class TmdbClient
         media_type: c["media_type"], id: c["id"],
         title: c["title"] || c["name"],
         year: year_of(c["release_date"] || c["first_air_date"]),
-        character: c["character"], genre_ids: Array(c["genre_ids"])
+        character: c["character"], genre_ids: Array(c["genre_ids"]),
+        episode_count: c["episode_count"]&.to_i, poster_url: image_url(c["poster_path"], "w185"),
+        popularity: c["popularity"]
       )
     end
   end
 
+  # { person_id => [Credit] or nil }, fanned out like people_details; a failed person gets nil.
+  def people_credits(person_ids, concurrency: 8)
+    fan_out(person_ids, "credits", concurrency) { |id| person_credits(id) }
+  end
+
+  # Ids of every movie or tv show matching a /discover filter, e.g. with_companies: 420.
+  # Pages are cached like any other request; TMDb caps discover at 500 pages.
+  def discover_ids(media_type, max_pages: 25, **filter)
+    ids = []
+    page = 1
+    loop do
+      raw = get("/discover/#{media_type}", query: filter.merge(page: page))
+      ids.concat(Array(raw["results"]).map { |r| r["id"] })
+      break if page >= [ raw["total_pages"].to_i, max_pages ].min
+
+      page += 1
+    end
+    ids
+  end
+
   private
+
+  # { id => block result, or nil if the block raised a TMDb/network error }, run on a small thread pool.
+  def fan_out(ids, label, concurrency)
+    ids = ids.uniq
+    return {} if ids.empty?
+
+    connection # build the connection once, before the threads race to create it
+    queue = Queue.new.tap { |q| ids.each { |id| q << id } }
+    results = {}
+    lock = Mutex.new
+
+    Array.new([ concurrency, ids.size ].min) do
+      Thread.new do
+        Rails.application.executor.wrap do
+          while (id = next_from(queue))
+            value = begin
+              yield id
+            rescue Error, Faraday::Error => e
+              Rails.logger.warn("TMDb #{label} #{id} lookup failed: #{e.message}")
+              nil
+            end
+            lock.synchronize { results[id] = value }
+          end
+        end
+      end
+    end.each(&:join)
+
+    ids.to_h { |id| [ id, results[id] ] }
+  end
 
   def next_from(queue)
     queue.pop(true)
