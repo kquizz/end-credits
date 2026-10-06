@@ -109,7 +109,9 @@ export default class extends Controller {
     face.style.width = face.style.height = `${px}px`
     if (p.photo_url) { face.src = p.photo_url; face.alt = ""; face.loading = "lazy" }
     else { face.textContent = this.initials(p.name); face.style.fontSize = `${px / 3}px` }
-    wrap.append(face, this.el("span", "mt-1 text-xs font-medium leading-tight", p.name))
+    const label = this.el("span", "mt-1 text-xs font-medium leading-tight", this.characterLabel(p))
+    wrap.append(face, label)
+    if (label.textContent !== p.name) wrap.append(this.el("span", "text-xs leading-tight text-slate-500", p.name))
     wrap.tabIndex = 0
     wrap.addEventListener("mouseenter", (e) => this.showTip(p, e))
     wrap.addEventListener("mousemove", (e) => this.moveTip(e))
@@ -124,8 +126,7 @@ export default class extends Controller {
     const tip = this.tooltipTarget
     tip.replaceChildren(this.el("div", "font-semibold", `${p.name} · ${p.total_episodes} episodes`))
     p.shows.forEach((s) => {
-      const chars = s.characters.length ? ` as ${s.characters.join(", ")}` : ""
-      tip.append(this.el("div", "mt-1 text-slate-300", `${this.titles[s.series_id]}: ${s.episodes} ep${chars}`))
+      tip.append(this.el("div", "mt-1 text-slate-300", `${this.titles[s.series_id]}: ${s.episodes} ep`))
     })
     tip.hidden = false
     this.moveTip(pos)
@@ -136,6 +137,12 @@ export default class extends Controller {
     const y = pos.clientY ?? pos.bottom
     this.tooltipTarget.style.left = `${Math.min(x + 12, window.innerWidth - 300)}px`
     this.tooltipTarget.style.top = `${y + 12}px`
+  }
+
+  // One character per show the person matched, e.g. "Diane Lockhart / Agnes van Rhijn".
+  characterLabel(p) {
+    const names = p.shows.map((s) => s.characters[0]).filter(Boolean)
+    return names.length ? [...new Set(names)].join(" / ") : p.name
   }
 
   initials(name) {
