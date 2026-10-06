@@ -1,0 +1,32 @@
+<% content_for :title, "Co-star Web" %>
+
+<div class="w-full max-w-5xl mx-auto"
+     data-controller="costars"
+     data-costars-search-url-value="<%= costars_search_path %>"
+     data-costars-overlap-url-value="<%= costars_overlap_path %>">
+  <%= link_to "← Home", root_path, class: "text-sm text-slate-500 hover:underline" %>
+  <h1 class="text-3xl font-bold mt-2 mb-1">Co-star Web</h1>
+  <p class="text-slate-500 mb-6">Pick two or more TV series and see who appeared in more than one. Bigger photo, more episodes together.</p>
+
+  <div class="relative max-w-2xl">
+    <input type="search" autocomplete="off" autofocus placeholder="Search a TV series…"
+           data-costars-target="input" data-action="input->costars#search"
+           class="w-full border border-slate-300 rounded-lg px-4 py-3 text-lg">
+    <ul data-costars-target="results" hidden
+        class="absolute z-10 mt-1 w-full rounded-lg border border-slate-200 bg-white shadow-lg flex flex-col gap-1 p-1"></ul>
+  </div>
+
+  <ul data-costars-target="chips" class="mt-4 flex flex-wrap gap-2"></ul>
+
+  <div class="mt-4 flex items-center gap-3">
+    <button type="button" data-costars-target="button" data-action="costars#render" disabled
+            class="rounded-lg bg-slate-900 px-4 py-2 font-medium text-white disabled:opacity-40">Find overlap</button>
+    <p data-costars-target="status" class="text-sm text-slate-500" role="status"></p>
+  </div>
+
+  <div class="relative mt-8">
+    <div data-costars-target="canvas" class="flex flex-wrap items-center justify-center gap-3"></div>
+    <div data-costars-target="tooltip" hidden
+         class="pointer-events-none fixed z-20 max-w-xs rounded-lg bg-slate-900 p-3 text-sm text-white shadow-lg"></div>
+  </div>
+</div>

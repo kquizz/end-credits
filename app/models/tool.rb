@@ -14,7 +14,8 @@ class Tool
               blurb: "How old was everyone when this movie or episode premiered?",
               path: "/ages"),
     Entry.new(slug: "costars", title: "Co-star Web", emoji: "🕸️",
-              blurb: "Who in this cast worked together on something else?"),
+              blurb: "Pick two or more series and see who appeared in several of them.",
+              path: "/costars"),
     Entry.new(slug: "degrees", title: "Six Degrees", emoji: "🔗",
               blurb: "Connect two actors through shared credits. No Marvel, no voice acting.")
   ].freeze
