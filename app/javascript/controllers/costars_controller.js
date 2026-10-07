@@ -321,6 +321,43 @@ export default class extends Controller {
       .attr("stroke-opacity", (l) => [0, 0.7, 0.9][rank(l)])
     w.hubSel.attr("opacity", (h) => (!on || hubOn.has(h.id) ? 1 : 0.25))
     w.personSel.attr("opacity", (n) => (!on || n.p.id === sel || n.p.id === hov ? 1 : 0.25))
+    this.drawLabels()
+  }
+
+  // Floating "characters + name" label for the selected and hovered people only.
+  drawLabels() {
+    const w = this.webParts
+    const ids = [...new Set([this.selectedId, this.hoverId].filter((id) => id !== null))]
+    const nodes = ids.map((id) => w.nodeById.get(id)).filter(Boolean)
+    w.labelLayer.selectAll("g").data(nodes, (n) => n.id).join((enter) => {
+      const g = enter.append("g")
+      const text = g.append("text").attr("text-anchor", "middle").attr("fill", "#0f172a")
+        .style("paint-order", "stroke").attr("stroke", "#fff").attr("stroke-width", 4).attr("stroke-linejoin", "round")
+      text.append("tspan").attr("class", "who").attr("x", 0).attr("font-size", 12).attr("font-weight", 700)
+        .text((n) => this.truncate(this.characterLabel(n.p), 44))
+      text.append("tspan").attr("class", "name").attr("x", 0).attr("dy", 14).attr("font-size", 11)
+        .attr("fill", "#475569").text((n) => (this.characterLabel(n.p) === n.p.name ? "" : n.p.name))
+      return g
+    })
+    this.placeLabels()
+  }
+
+  // Labels sit under the node (above it near the bottom edge), kept inside the frame and at a
+  // constant on-screen size regardless of zoom.
+  placeLabels() {
+    const w = this.webParts
+    if (!w) return
+    const k = w.k
+    w.labelLayer.selectAll("g").each((n, i, els) => {
+      const chars = Math.max(n.p.name.length, Math.min(44, this.characterLabel(n.p).length))
+      const half = (chars * 3.4 + 4) / k
+      const x = Math.max(half, Math.min(w.width - half, n.x))
+      const above = n.y + n.r + 40 / k > w.height
+      const y = above ? n.y - n.r : n.y + n.r
+      const g = d3.select(els[i])
+      g.attr("transform", `translate(${x},${y}) scale(${1 / k})`)
+      g.select(".who").attr("y", above ? -22 : 14)
+    })
   }
 
   styleToggle(btn, on) {
@@ -395,24 +432,15 @@ export default class extends Controller {
     const svg = d3.select(this.webTarget).append("svg")
       .attr("viewBox", `0 0 ${width} ${height}`).attr("width", width).attr("height", height)
       .style("display", "block").on("click", () => this.clearSelection())
+    const layer = svg.append("g") // zoom/pan transform goes here
     const defs = svg.append("defs")
     nodes.forEach((n) => defs.append("clipPath").attr("id", `clip-${n.id}`)
       .append("circle").attr("r", n.r))
 
-    const link = svg.append("g").attr("stroke", "#475569").style("pointer-events", "none")
+    const link = layer.append("g").attr("stroke", "#475569").style("pointer-events", "none")
       .selectAll("line").data(links).join("line").attr("stroke-opacity", 0)
 
-    const hubSel = svg.append("g").selectAll("g").data(hubs).join("g")
-    hubSel.append("circle").attr("r", hubR).attr("fill", "#0f172a")
-    hubSel.each((h, i, els) => {
-      const text = d3.select(els[i]).append("text").attr("text-anchor", "middle").attr("fill", "#fff")
-        .attr("font-size", 12).attr("font-weight", 700).style("pointer-events", "none")
-      const lines = this.wrap(h.title, 12, 3)
-      lines.forEach((ln, li) => text.append("tspan").attr("x", 0)
-        .attr("y", (li - (lines.length - 1) / 2) * 14 + 4).text(ln))
-    })
-
-    const personSel = svg.append("g").selectAll("g").data(nodes).join("g").style("cursor", "grab")
+    const personSel = layer.append("g").selectAll("g").data(nodes).join("g").style("cursor", "grab")
     personSel.each((n, i, els) => {
       const g = d3.select(els[i])
       if (n.p.photo_url) {
@@ -427,18 +455,24 @@ export default class extends Controller {
           .text(this.initials(n.p.name))
       }
       g.append("circle").attr("r", n.r).attr("fill", "none").attr("stroke", "#fff").attr("stroke-width", 2)
-      if (n.r >= 34) {
-        const label = this.truncate(this.characterLabel(n.p), 26)
-        g.append("text").attr("text-anchor", "middle").attr("y", n.r + 12).attr("font-size", 10)
-          .attr("font-weight", 600).attr("fill", "#0f172a").style("pointer-events", "none")
-          .style("paint-order", "stroke").attr("stroke", "#fff").attr("stroke-width", 3).text(label)
-      }
       g.on("click", (e) => { e.stopPropagation(); this.select(n.p) })
         .on("mouseenter", (e) => { this.hoverId = n.p.id; this.showTip(n.p, e); this.paintWeb() })
         .on("mousemove", (e) => this.moveTip(e))
         .on("mouseleave", () => { this.hoverId = null; this.tooltipTarget.hidden = true; this.paintWeb() })
     })
 
+    const hubSel = layer.append("g").selectAll("g").data(hubs).join("g")
+    hubSel.append("circle").attr("r", hubR).attr("fill", "#0f172a").attr("stroke", "#fff").attr("stroke-width", 3)
+    hubSel.each((h, i, els) => {
+      const text = d3.select(els[i]).append("text").attr("text-anchor", "middle").attr("fill", "#fff")
+        .attr("font-size", 12).attr("font-weight", 700).style("pointer-events", "none")
+        .style("paint-order", "stroke").attr("stroke", "#0f172a").attr("stroke-width", 3).attr("stroke-linejoin", "round")
+      const lines = this.wrap(h.title, 12, 3)
+      lines.forEach((ln, li) => text.append("tspan").attr("x", 0)
+        .attr("y", (li - (lines.length - 1) / 2) * 14 + 4).text(ln))
+    })
+
+    const labelLayer = layer.append("g").style("pointer-events", "none")
     const sim = d3.forceSimulation(all)
       .force("link", d3.forceLink(links).id((d) => d.id).distance((l) => 70 + l.source.r + hubR).strength(0.08))
       .force("charge", d3.forceManyBody().strength((d) => (d.hub ? 0 : -90)))
@@ -454,9 +488,11 @@ export default class extends Controller {
           .attr("x2", (l) => l.target.x).attr("y2", (l) => l.target.y)
         hubSel.attr("transform", (d) => `translate(${d.x},${d.y})`)
         personSel.attr("transform", (d) => `translate(${d.x},${d.y})`)
+        this.placeLabels()
       })
     this.simulation = sim
-    this.webParts = { link, hubSel, personSel, links }
+    this.webParts = { link, hubSel, personSel, links, labelLayer, width, height, k: 1,
+                      nodeById: new Map(nodes.map((n) => [n.p.id, n])) }
 
     personSel.call(d3.drag()
       .on("start", (e, d) => { this.tooltipTarget.hidden = true; if (!e.active) sim.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y })
