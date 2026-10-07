@@ -408,10 +408,13 @@ export default class extends Controller {
     const height = 680
     const hubR = 46
     const hubs = this.overlap.series.map((s, i, all) => {
-      const angle = -Math.PI / 2 + (2 * Math.PI * i) / all.length
+      // 2 hubs sit left/right, 3+ form a regular polygon (stretched to the frame) around the center.
       const two = all.length === 2
-      const x = two ? width * (i === 0 ? 0.11 : 0.89) : width / 2 + Math.cos(angle) * width * 0.34
-      const y = two ? height / 2 : height / 2 + Math.sin(angle) * height * 0.34
+      const angle = -Math.PI / 2 + (2 * Math.PI * i) / all.length
+      const rx = (width / 2 - hubR - 24) * (all.length > 2 ? 0.85 : 1)
+      const ry = (height / 2 - hubR - 24) * (all.length > 2 ? 0.85 : 1)
+      const x = two ? width / 2 + (i === 0 ? -rx : rx) * 0.85 : width / 2 + Math.cos(angle) * rx
+      const y = two ? height / 2 : height / 2 + Math.sin(angle) * ry
       return { id: `s${s.id}`, hub: true, title: s.title, r: hubR, x, y, fx: x, fy: y, seriesId: s.id }
     })
     const hubById = new Map(hubs.map((h) => [h.seriesId, h]))
@@ -419,7 +422,9 @@ export default class extends Controller {
       const matched = p.shows.map((s) => hubById.get(s.series_id)).filter(Boolean)
       const cx = d3.mean(matched, (h) => h.x) ?? width / 2
       const cy = d3.mean(matched, (h) => h.y) ?? height / 2
-      return { id: `p${p.id}`, p, r: (MIN_PX + p.size * (MAX_PX - MIN_PX)) * WEB_SCALE / 2,
+      // Each person is pulled toward the centroid of the hubs they matched, so people who share the
+      // same shows land together (everyone in all shows ends up in the middle).
+      return { id: `p${p.id}`, p, tx: cx, ty: cy, r: (MIN_PX + p.size * (MAX_PX - MIN_PX)) * WEB_SCALE / 2,
                x: cx + (Math.random() - 0.5) * 40, y: cy + (Math.random() - 0.5) * 40 }
     })
     const links = []
@@ -431,7 +436,7 @@ export default class extends Controller {
 
     const svg = d3.select(this.webTarget).append("svg")
       .attr("viewBox", `0 0 ${width} ${height}`).attr("width", width).attr("height", height)
-      .style("display", "block").on("click", () => this.clearSelection())
+      .style("display", "block").style("user-select", "none").on("click", () => this.clearSelection())
     const layer = svg.append("g") // zoom/pan transform goes here
     const defs = svg.append("defs")
     nodes.forEach((n) => defs.append("clipPath").attr("id", `clip-${n.id}`)
@@ -474,11 +479,11 @@ export default class extends Controller {
 
     const labelLayer = layer.append("g").style("pointer-events", "none")
     const sim = d3.forceSimulation(all)
-      .force("link", d3.forceLink(links).id((d) => d.id).distance((l) => 70 + l.source.r + hubR).strength(0.08))
-      .force("charge", d3.forceManyBody().strength((d) => (d.hub ? 0 : -90)))
-      .force("collide", d3.forceCollide((d) => d.r + (d.hub ? 6 : 16)).iterations(3))
-      .force("x", d3.forceX(width / 2).strength(0.03))
-      .force("y", d3.forceY(height / 2).strength(0.03))
+      .force("link", d3.forceLink(links).id((d) => d.id).distance((l) => 70 + l.source.r + hubR).strength(0.01))
+      .force("charge", d3.forceManyBody().strength((d) => (d.hub ? 0 : -25)))
+      .force("collide", d3.forceCollide((d) => d.r + (d.hub ? 10 : 4)).iterations(3))
+      .force("x", d3.forceX((d) => d.tx ?? width / 2).strength(0.12))
+      .force("y", d3.forceY((d) => d.ty ?? height / 2).strength(0.12))
       .on("tick", () => {
         nodes.forEach((n) => {
           n.x = Math.max(n.r, Math.min(width - n.r, n.x))
@@ -590,7 +595,9 @@ export default class extends Controller {
     const x = pos.clientX ?? pos.left
     const y = pos.clientY ?? pos.bottom
     this.tooltipTarget.style.left = `${Math.min(x + 12, window.innerWidth - 300)}px`
-    this.tooltipTarget.style.top = `${y + 12}px`
+    // In the web the node's own label sits below it, so the tooltip goes above the pointer.
+    const lift = this.view === "web" ? -this.tooltipTarget.offsetHeight - 24 : 0
+    this.tooltipTarget.style.top = `${Math.max(4, y + 12 + lift)}px`
   }
 
   // One character per show the person matched, e.g. "Diane Lockhart / Agnes van Rhijn".
