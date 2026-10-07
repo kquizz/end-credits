@@ -51,6 +51,12 @@ class TmdbClient
     end
   end
 
+  # One person's basics (name and photo) by id.
+  def person(person_id)
+    raw = get("/person/#{person_id}")
+    PersonResult.new(id: raw["id"], name: raw["name"], known_for: [], photo_url: image_url(raw["profile_path"], "w185"))
+  end
+
   def movie(id)
     raw = get("/movie/#{id}")
     Title.new(id: id, name: raw["title"], date: parse_date(raw["release_date"]))

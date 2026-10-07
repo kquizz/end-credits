@@ -71,6 +71,14 @@ RSpec.describe TmdbClient do
     end
   end
 
+  describe "#person" do
+    it "returns name and photo" do
+      stub_tmdb("/person/31", { id: 31, name: "Tom Hanks", profile_path: "/t.jpg" })
+
+      expect(client.person(31)).to have_attributes(id: 31, name: "Tom Hanks", photo_url: "https://image.tmdb.org/t/p/w185/t.jpg")
+    end
+  end
+
   describe "#episode_cast" do
     it "puts regular cast before guest stars and de-duplicates" do
       stub_tmdb("/tv/1/season/2/episode/3/credits", {
