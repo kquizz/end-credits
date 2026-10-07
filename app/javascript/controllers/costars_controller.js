@@ -297,21 +297,30 @@ export default class extends Controller {
     panel.hidden = false
   }
 
-  // Grid: ring the chosen bubble. Web: keep the person's links and hubs bright, dim everything else.
+  // Grid: ring the chosen bubble. Web: see paintWeb.
   highlight() {
     const id = this.selectedId
     this.canvasTarget.querySelectorAll("[data-person-id]").forEach((el) => {
       el.firstChild.style.outline = el.dataset.personId === String(id) ? "3px solid #0f172a" : ""
     })
+    this.paintWeb()
+  }
+
+  // Web: links stay invisible until a person is hovered (transient) or selected (persistent,
+  // dims everyone else). Hubs always show.
+  paintWeb() {
     const w = this.webParts
     if (!w) return
-    const on = id !== null
-    const mine = (l) => on && l.source.p?.id === id
-    const hubOn = new Set(w.links.filter(mine).map((l) => l.target.id))
-    w.link.attr("stroke", (l) => (mine(l) ? "#0f172a" : "#cbd5e1")).attr("stroke-width", (l) => (mine(l) ? 3 : 1.5))
-      .attr("stroke-opacity", (l) => (!on || mine(l) ? 0.9 : 0.1))
+    const sel = this.selectedId
+    const hov = this.hoverId
+    const on = sel !== null
+    const rank = (l) => (l.source.p.id === sel ? 2 : l.source.p.id === hov ? 1 : 0)
+    const hubOn = new Set(w.links.filter((l) => rank(l) === 2).map((l) => l.target.id))
+    w.link.attr("stroke", (l) => (rank(l) === 2 ? "#0f172a" : "#475569"))
+      .attr("stroke-width", (l) => (rank(l) === 2 ? 3 : 2))
+      .attr("stroke-opacity", (l) => [0, 0.7, 0.9][rank(l)])
     w.hubSel.attr("opacity", (h) => (!on || hubOn.has(h.id) ? 1 : 0.25))
-    w.personSel.attr("opacity", (n) => (!on || n.p.id === id ? 1 : 0.25))
+    w.personSel.attr("opacity", (n) => (!on || n.p.id === sel || n.p.id === hov ? 1 : 0.25))
   }
 
   styleToggle(btn, on) {
@@ -353,6 +362,7 @@ export default class extends Controller {
     this.simulation?.stop()
     this.simulation = null
     this.webParts = null
+    this.hoverId = null
     this.webTarget.replaceChildren()
   }
 
@@ -389,8 +399,8 @@ export default class extends Controller {
     nodes.forEach((n) => defs.append("clipPath").attr("id", `clip-${n.id}`)
       .append("circle").attr("r", n.r))
 
-    const link = svg.append("g").attr("stroke", "#cbd5e1").attr("stroke-opacity", 0.8)
-      .selectAll("line").data(links).join("line").attr("stroke-width", 1.5)
+    const link = svg.append("g").attr("stroke", "#475569").style("pointer-events", "none")
+      .selectAll("line").data(links).join("line").attr("stroke-opacity", 0)
 
     const hubSel = svg.append("g").selectAll("g").data(hubs).join("g")
     hubSel.append("circle").attr("r", hubR).attr("fill", "#0f172a")
@@ -424,9 +434,9 @@ export default class extends Controller {
           .style("paint-order", "stroke").attr("stroke", "#fff").attr("stroke-width", 3).text(label)
       }
       g.on("click", (e) => { e.stopPropagation(); this.select(n.p) })
-        .on("mouseenter", (e) => this.showTip(n.p, e))
+        .on("mouseenter", (e) => { this.hoverId = n.p.id; this.showTip(n.p, e); this.paintWeb() })
         .on("mousemove", (e) => this.moveTip(e))
-        .on("mouseleave", () => (this.tooltipTarget.hidden = true))
+        .on("mouseleave", () => { this.hoverId = null; this.tooltipTarget.hidden = true; this.paintWeb() })
     })
 
     const sim = d3.forceSimulation(all)
