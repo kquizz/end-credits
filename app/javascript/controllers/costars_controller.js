@@ -455,7 +455,7 @@ export default class extends Controller {
           .text(this.initials(n.p.name))
       }
       g.append("circle").attr("r", n.r).attr("fill", "none").attr("stroke", "#fff").attr("stroke-width", 2)
-      g.on("click", (e) => { e.stopPropagation(); this.select(n.p) })
+      g.attr("data-person", "").on("click", (e) => { e.stopPropagation(); this.select(n.p) })
         .on("mouseenter", (e) => { this.hoverId = n.p.id; this.showTip(n.p, e); this.paintWeb() })
         .on("mousemove", (e) => this.moveTip(e))
         .on("mouseleave", () => { this.hoverId = null; this.tooltipTarget.hidden = true; this.paintWeb() })
@@ -482,7 +482,7 @@ export default class extends Controller {
       .on("tick", () => {
         nodes.forEach((n) => {
           n.x = Math.max(n.r, Math.min(width - n.r, n.x))
-          n.y = Math.max(n.r, Math.min(height - n.r - 14, n.y))
+          n.y = Math.max(n.r, Math.min(height - n.r, n.y))
         })
         link.attr("x1", (l) => l.source.x).attr("y1", (l) => l.source.y)
           .attr("x2", (l) => l.target.x).attr("y2", (l) => l.target.y)
@@ -496,8 +496,45 @@ export default class extends Controller {
 
     personSel.call(d3.drag()
       .on("start", (e, d) => { this.tooltipTarget.hidden = true; if (!e.active) sim.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y })
-      .on("drag", (e, d) => { d.fx = e.x; d.fy = e.y })
+      .on("drag", (e, d) => {
+        d.fx = Math.max(d.r, Math.min(width - d.r, e.x))
+        d.fy = Math.max(d.r, Math.min(height - d.r, e.y))
+      })
       .on("end", (e, d) => { if (!e.active) sim.alphaTarget(0); d.fx = null; d.fy = null }))
+
+    this.addZoom(svg, layer, width, height)
+  }
+
+  // Wheel/pinch zoom (0.5x-4x) and background drag-pan. Dragging a person moves the person, not the
+  // canvas, so pointer-driven pan starts are ignored when they begin on a node.
+  addZoom(svg, layer, width, height) {
+    const zoom = d3.zoom().scaleExtent([0.5, 4])
+      .translateExtent([[-100, -100], [width + 100, height + 100]])
+      .filter((e) => {
+        if (e.ctrlKey && e.type !== "wheel") return false
+        if (e.button) return false
+        return e.type === "wheel" || !e.target.closest("[data-person]")
+      })
+      .on("zoom", (e) => {
+        layer.attr("transform", e.transform)
+        this.webParts.k = e.transform.k
+        this.placeLabels()
+      })
+    svg.call(zoom).on("dblclick.zoom", null).style("cursor", "move")
+    const bar = this.el("div", "absolute flex flex-col overflow-hidden rounded-lg border border-slate-300 bg-white text-lg shadow")
+    bar.style.cssText = "right:8px;top:8px"
+    const btn = (label, title, fn) => {
+      const b = this.el("button", "h-8 w-8 leading-none text-slate-700 hover:bg-slate-100", label)
+      b.type = "button"
+      b.title = title
+      b.setAttribute("aria-label", title)
+      b.addEventListener("click", fn)
+      bar.append(b)
+    }
+    btn("+", "Zoom in", () => svg.transition().duration(200).call(zoom.scaleBy, 1.5))
+    btn("−", "Zoom out", () => svg.transition().duration(200).call(zoom.scaleBy, 1 / 1.5))
+    btn("⟲", "Reset zoom", () => svg.transition().duration(200).call(zoom.transform, d3.zoomIdentity))
+    this.webTarget.append(bar)
   }
 
   wrap(text, width, maxLines) {
