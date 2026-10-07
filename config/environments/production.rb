@@ -24,8 +24,12 @@ Rails.application.configure do
   # Store uploaded files on the local file system (see config/storage.yml for options).
   config.active_storage.service = :local
 
-  # Assume all access to the app is happening through a SSL-terminating reverse proxy.
-  # config.assume_ssl = true
+  # Cloudflare terminates HTTPS and the tunnel speaks plain HTTP to us, so treat requests as
+  # SSL (https URLs in the invite link) without force_ssl, which would redirect-loop.
+  config.assume_ssl = true
+
+  # The live Six Degrees rooms use a websocket; allow the public hostname.
+  config.action_cable.allowed_request_origins = [ "https://credits.kquizz.com" ]
 
   # Force all access to the app over SSL, use Strict-Transport-Security, and use secure cookies.
   # config.force_ssl = true
