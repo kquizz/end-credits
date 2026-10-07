@@ -18,6 +18,15 @@ RSpec.describe "Costars", type: :request do
       expect(response.body).to include("Co-star Web", costars_overlap_path)
       expect(TmdbClient).not_to have_received(:new)
     end
+
+    it "includes a hidden top-people toggle for the web view" do
+      get costars_path
+
+      toggle = Nokogiri::HTML(response.body).at_css("[data-costars-target=topBtn]")
+      expect(toggle).to be_present
+      expect(toggle["data-action"]).to eq("costars#toggleTop")
+      expect(toggle.has_attribute?("hidden")).to be(true)
+    end
   end
 
   describe "GET /costars with ids (shareable link)" do

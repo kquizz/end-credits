@@ -4,10 +4,11 @@ import * as d3 from "d3"
 const MIN_PX = 48
 const MAX_PX = 180
 const WEB_SCALE = 0.65
+const WEB_TOP = 40 // the web caps at this many people (by episodes) unless "show all" is on
 
 // Series picker (search -> chips) plus the overlap bubbles. Plain DOM, no charting library.
 export default class extends Controller {
-  static targets = ["input", "results", "chips", "button", "status", "canvas", "tooltip", "detail", "controls", "gridBtn", "webBtn", "allWrap", "allShows", "minWrap", "minValue", "minEp", "web", "watchSection", "watchBtn", "watchStatus", "watchList", "skipSelf", "skipVoice", "skipMarvel"]
+  static targets = ["input", "results", "chips", "button", "status", "canvas", "tooltip", "detail", "controls", "gridBtn", "webBtn", "topBtn", "allWrap", "allShows", "minWrap", "minValue", "minEp", "web", "watchSection", "watchBtn", "watchStatus", "watchList", "skipSelf", "skipVoice", "skipMarvel"]
   static values = { searchUrl: String, overlapUrl: String, watchNextUrl: String, preload: Array }
 
   connect() {
@@ -20,6 +21,7 @@ export default class extends Controller {
     this.view = new URLSearchParams(location.search).get("view") === "web" ? "web" : "grid"
     this.pendingMin = parseInt(new URLSearchParams(location.search).get("min"), 10) || 1
     this.pendingAll = new URLSearchParams(location.search).get("all") === "1"
+    this.topAll = new URLSearchParams(location.search).get("top") === "all"
     this.preloadValue.forEach((item) => this.series.set(item.id, item))
     this.drawChips()
     if (this.series.size >= 2) this.render()
@@ -97,6 +99,7 @@ export default class extends Controller {
     if (this.view === "web") parts.push("view=web")
     if (this.allRequired()) parts.push("all=1")
     if (this.minEpisodes() > 1) parts.push(`min=${this.minEpisodes()}`)
+    if (this.view === "web" && this.topAll) parts.push("top=all")
     const query = this.series.size ? `?${parts.join("&")}` : ""
     history.replaceState(null, "", `${location.pathname}${query}`)
   }
@@ -148,6 +151,12 @@ export default class extends Controller {
 
   setView(view) {
     this.view = view
+    this.syncUrl()
+    this.redraw()
+  }
+
+  toggleTop() {
+    this.topAll = !this.topAll
     this.syncUrl()
     this.redraw()
   }
@@ -241,10 +250,14 @@ export default class extends Controller {
   // Re-renders the current view from the cached data; never refetches.
   redraw() {
     if (!this.overlap) return
-    const people = this.visiblePeople()
-    this.minValueTarget.textContent = this.minEpisodes()
-    this.statusTarget.textContent = this.statusText(people)
+    const everyone = this.visiblePeople()
     const web = this.view === "web"
+    const capped = web && !this.topAll && everyone.length > WEB_TOP
+    const people = capped ? this.topPeople(everyone) : everyone
+    this.minValueTarget.textContent = this.minEpisodes()
+    this.statusTarget.textContent = this.statusText(people, everyone.length)
+    this.topBtnTarget.hidden = !web || everyone.length <= WEB_TOP
+    this.topBtnTarget.textContent = this.topAll ? `Show top ${WEB_TOP}` : `Show all (${everyone.length})`
     this.canvasTarget.hidden = web
     this.webTarget.hidden = !web
     this.styleToggle(this.gridBtnTarget, !web)
@@ -365,13 +378,18 @@ export default class extends Controller {
     btn.setAttribute("aria-pressed", String(on))
   }
 
-  statusText(people) {
+  topPeople(people) {
+    return [...people].sort((a, b) => b.total_episodes - a.total_episodes || a.name.localeCompare(b.name)).slice(0, WEB_TOP)
+  }
+
+  statusText(people, total = people.length) {
     if (!this.overlap.people.length) return "Nobody appears in more than one of these series."
     if (!people.length) return "Nobody left after filtering."
     const min = this.minEpisodes()
     const filters = min > 1 ? `, ${min}+ episodes in a show` : ""
     const scope = this.allRequired() ? `all ${this.overlap.series.length}` : "at least 2"
-    return `${people.length} ${people.length === 1 ? "person" : "people"} in ${scope} of these series${filters}.`
+    const count = people.length < total ? `Showing ${people.length} of ${total} people` : `${total} ${total === 1 ? "person" : "people"}`
+    return `${count} in ${scope} of these series${filters}.`
   }
 
   // A person's biggest single-show episode count.
