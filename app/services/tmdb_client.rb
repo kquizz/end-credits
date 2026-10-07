@@ -18,9 +18,10 @@ class TmdbClient
   CastMember = Struct.new(:person_id, :name, :character, :photo_url, keyword_init: true)
   # One person's whole run on a series: roles is [{ character:, episode_count: }].
   AggregateCastMember = Struct.new(:person_id, :name, :photo_url, :total_episodes, :roles, keyword_init: true)
-  # episode_count is TV only (nil for movies); popularity and poster_url are TMDb's, for ranking and thumbnails.
+  # episode_count is TV only (nil for movies); popularity, vote_count and poster_url are TMDb's, for ranking
+  # (vote_count is a good "is this well known" signal) and thumbnails.
   Credit = Struct.new(:media_type, :id, :title, :year, :character, :genre_ids,
-                      :episode_count, :poster_url, :popularity, keyword_init: true)
+                      :episode_count, :poster_url, :popularity, :vote_count, keyword_init: true)
 
   def initialize(token: Rails.application.config.tmdb_api_token, cache: Rails.cache)
     @token = token
@@ -49,6 +50,19 @@ class TmdbClient
         photo_url: image_url(r["profile_path"], "w185")
       )
     end
+  end
+
+  # TMDb's "popular people" chart, one page of ~20. Actors only (the chart also has directors and crew).
+  def popular_people(page = 1)
+    Array(get("/person/popular", query: { page: page })["results"])
+      .select { |r| r["known_for_department"] == "Acting" }
+      .map do |r|
+        PersonResult.new(
+          id: r["id"], name: r["name"],
+          known_for: Array(r["known_for"]).filter_map { |k| k["title"] || k["name"] }.first(3),
+          photo_url: image_url(r["profile_path"], "w185")
+        )
+      end
   end
 
   # One person's basics (name and photo) by id.
@@ -125,7 +139,7 @@ class TmdbClient
         year: year_of(c["release_date"] || c["first_air_date"]),
         character: c["character"], genre_ids: Array(c["genre_ids"]),
         episode_count: c["episode_count"]&.to_i, poster_url: image_url(c["poster_path"], "w185"),
-        popularity: c["popularity"]
+        popularity: c["popularity"], vote_count: c["vote_count"]&.to_i
       )
     end
   end

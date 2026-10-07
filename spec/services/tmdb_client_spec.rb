@@ -71,6 +71,22 @@ RSpec.describe TmdbClient do
     end
   end
 
+  describe "#popular_people" do
+    it "returns the actors on the requested page, with photo urls" do
+      stub_tmdb("/person/popular", { results: [
+        { id: 1, name: "Actor", known_for_department: "Acting", profile_path: "/a.jpg", known_for: [ { title: "Heat" } ] },
+        { id: 2, name: "Director", known_for_department: "Directing", profile_path: "/d.jpg" },
+        { id: 3, name: "No Photo", known_for_department: "Acting", profile_path: nil }
+      ] }, query: { "page" => "2" })
+
+      people = client.popular_people(2)
+
+      expect(people.map(&:id)).to eq([ 1, 3 ])
+      expect(people.first).to have_attributes(known_for: [ "Heat" ], photo_url: "https://image.tmdb.org/t/p/w185/a.jpg")
+      expect(people.last.photo_url).to be_nil
+    end
+  end
+
   describe "#person" do
     it "returns name and photo" do
       stub_tmdb("/person/31", { id: 31, name: "Tom Hanks", profile_path: "/t.jpg" })
