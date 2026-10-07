@@ -12,6 +12,52 @@ RSpec.describe "Degrees", type: :request do
 
   def person(id, name) = TmdbClient::PersonResult.new(id: id, name: name, known_for: [], photo_url: "#{name}.jpg")
 
+  describe "GET /degrees" do
+    before do
+      allow(tmdb).to receive(:person).with(31).and_return(person(31, "Tom Hanks"))
+      allow(tmdb).to receive(:person).with(5064).and_return(person(5064, "Meryl Streep"))
+    end
+
+    it "renders the game for the start and target in the URL" do
+      get degrees_path(start: 31, target: 5064, tier: "easy")
+
+      expect(response).to have_http_status(:ok)
+      game = Nokogiri::HTML(response.body).at_css("[data-controller=degrees]")
+      expect(JSON.parse(game["data-degrees-start-value"])).to include("id" => 31, "name" => "Tom Hanks")
+      expect(JSON.parse(game["data-degrees-target-value"])).to include("id" => 5064, "name" => "Meryl Streep")
+      expect(game["data-degrees-tier-value"]).to eq("easy")
+      expect(response.body).to include("Tom Hanks", "Meryl Streep", degrees_guess_path, degrees_people_path)
+    end
+
+    it "redirects to a fresh shareable pair from the tier when none is given" do
+      get degrees_path(tier: "hard")
+
+      expect(response).to have_http_status(:found)
+      query = Rack::Utils.parse_query(URI(response.location).query)
+      expect(query["tier"]).to eq("hard")
+      expect(query["start"]).to match(/\A\d+\z/)
+      expect(query["start"]).not_to eq(query["target"])
+      expect(TargetList.new.find(query["start"]).tier).to eq("hard")
+    end
+
+    it "draws a new pair when start equals target or TMDb doesn't know someone" do
+      get degrees_path(start: 31, target: 31)
+      expect(response).to have_http_status(:found)
+
+      allow(tmdb).to receive(:person).with(1).and_raise(TmdbClient::NotFound)
+      get degrees_path(start: 1, target: 31)
+      expect(response).to have_http_status(:found)
+    end
+
+    it "shows a friendly 502 when TMDb is down" do
+      allow(tmdb).to receive(:person).and_raise(TmdbClient::Error)
+
+      get degrees_path(start: 31, target: 5064)
+
+      expect(response).to have_http_status(:bad_gateway)
+    end
+  end
+
   describe "GET /degrees/people" do
     it "returns suggestions with photo and known-for titles" do
       allow(tmdb).to receive(:search_person).with("al pa").and_return([
