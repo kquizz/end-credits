@@ -17,7 +17,7 @@ class Tool
               blurb: "Pick two or more series and see who appeared in several of them.",
               path: "/costars"),
     Entry.new(slug: "degrees", title: "Six Degrees", emoji: "🔗",
-              blurb: "Connect two actors through shared credits. No Marvel, no voice acting.",
+              blurb: "Connect two actors through shared credits, solo or head-to-head with a friend.",
               path: "/degrees")
   ].freeze
 

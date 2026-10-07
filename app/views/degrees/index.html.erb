@@ -16,6 +16,7 @@
   <%= link_to "← Home", root_path, class: "text-sm text-slate-500 hover:underline" %>
   <div class="mt-2 mb-1 flex flex-wrap items-center justify-between gap-3">
     <h1 class="text-3xl font-bold">Six Degrees</h1>
+    <div class="flex flex-wrap items-center gap-2">
     <form method="get" action="<%= degrees_path %>" class="flex items-center gap-2">
       <label class="sr-only" for="tier">Difficulty</label>
       <select id="tier" name="tier" class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm">
@@ -26,6 +27,9 @@
       </select>
       <button type="submit" class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white">New game</button>
     </form>
+    <%= button_to "Play with a friend", degrees_rooms_path, method: :post, form_class: "contents",
+                  class: "rounded-lg border border-slate-900 px-4 py-2 text-sm font-medium text-slate-900 hover:bg-slate-100" %>
+    </div>
   </div>
   <p class="text-slate-500 mb-6">Connect the two actors. Name someone who shares a credit with the end of your chain, then keep going until you reach the target. Fewer hops is better.</p>
 

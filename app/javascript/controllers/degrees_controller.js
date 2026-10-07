@@ -1,4 +1,5 @@
 import { Controller } from "@hotwired/stimulus"
+import { el, avatar, chainNode, ghostNode, connector, shake } from "degrees/ui"
 
 // Six Degrees: autocomplete a name, ask the server whether they share a credit with the end of the
 // chain, and grow the chain until the target joins it. Plain DOM; the chain is a wrapping row of photo
@@ -133,10 +134,7 @@ export default class extends Controller {
   reject(message, shake) {
     this.say(message)
     if (shake) {
-      this.inputTarget.animate(
-        [{ transform: "translateX(0)" }, { transform: "translateX(-8px)" }, { transform: "translateX(8px)" },
-         { transform: "translateX(-6px)" }, { transform: "translateX(6px)" }, { transform: "translateX(0)" }],
-        { duration: 350 })
+      shake(this.inputTarget)
     }
     this.inputTarget.select()
   }
@@ -194,47 +192,22 @@ export default class extends Controller {
   }
 
   node(person) {
-    const li = this.el("li", "flex w-24 flex-col items-center text-center")
-    const isEnd = person.id === this.targetValue.id
-    li.append(this.avatar(person, "h-16 w-16", isEnd ? "ring-4 ring-emerald-500" : ""),
-              this.el("span", "mt-1 text-sm font-medium leading-tight", person.name))
-    return li
+    return chainNode(person, person.id === this.targetValue.id)
   }
 
   ghost() {
-    const li = this.el("li", "flex w-24 flex-col items-center text-center")
-    li.append(this.el("div", "flex h-16 w-16 items-center justify-center rounded-full border-2 border-dashed border-slate-300 text-xl text-slate-400", "?"),
-              this.el("span", "mt-1 text-sm text-slate-500 leading-tight", `toward ${this.targetValue.name}`))
-    return li
+    return ghostNode(`toward ${this.targetValue.name}`)
   }
 
-  // The link between two people: "both in Heat (1995)", plus a count if there are more.
   connector(titles) {
-    const li = this.el("li", "flex h-16 w-28 flex-col items-center justify-center px-1 text-center")
-    if (titles && titles.length) {
-      const t = titles[0]
-      li.append(this.el("span", "text-xs leading-tight text-slate-600", `both in ${t.title}${t.year ? ` (${t.year})` : ""}`))
-      if (titles.length > 1) li.append(this.el("span", "text-xs text-slate-400", `+${titles.length - 1} more`))
-    }
-    li.append(this.el("span", "text-lg leading-none text-slate-400", "→"))
-    return li
+    return connector(titles)
   }
 
   avatar(person, size, extra = "") {
-    if (person.photo_url) {
-      const img = this.el("img", `${size} shrink-0 rounded-full object-cover ${extra}`)
-      img.src = person.photo_url
-      img.alt = ""
-      return img
-    }
-    const initials = person.name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join("")
-    return this.el("div", `${size} flex shrink-0 items-center justify-center rounded-full bg-slate-200 text-sm font-semibold text-slate-600 ${extra}`, initials)
+    return avatar(person, size, extra)
   }
 
   el(tag, cls = "", text = "") {
-    const node = document.createElement(tag)
-    if (cls) node.className = cls
-    if (text !== "") node.textContent = text
-    return node
+    return el(tag, cls, text)
   }
 }
