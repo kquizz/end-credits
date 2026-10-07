@@ -1,0 +1,116 @@
+<% content_for :title, "Six Degrees with a friend" %>
+
+<% if @can_join %>
+  <div class="mx-auto w-full max-w-md">
+    <%= link_to "← Six Degrees", degrees_path, class: "text-sm text-slate-500 hover:underline" %>
+    <h1 class="mt-2 text-3xl font-bold">You're invited</h1>
+    <p class="mt-2 text-slate-600">
+      <%= @room.players.first["name"] %> wants to play Six Degrees with you: take turns bidding how few hops it takes to connect two actors, then prove it.
+    </p>
+    <%= form_with url: degrees_room_join_path(@room.code), method: :post, class: "mt-6 flex flex-col gap-3" do |f| %>
+      <%= f.label :name, "Your name", class: "text-sm font-medium text-slate-700" %>
+      <%= f.text_field :name, placeholder: "Player 2", maxlength: Room::MAX_NAME, autofocus: true, autocomplete: "nickname",
+                       class: "w-full rounded-lg border border-slate-300 px-4 py-3 text-lg" %>
+      <%= f.submit "Join the game", class: "rounded-lg bg-slate-900 px-4 py-3 font-medium text-white" %>
+    <% end %>
+  </div>
+<% else %>
+  <% invite_url = degrees_room_url(@room.code) %>
+  <div class="w-full max-w-4xl mx-auto"
+       data-controller="room"
+       data-room-code-value="<%= @room.code %>"
+       data-room-you-value="<%= @seat %>"
+       data-room-spectator-value="<%= @seat.nil? %>"
+       data-room-invite-url-value="<%= invite_url %>"
+       data-room-state-value="<%= @room.public_state.to_json %>"
+       data-room-people-url-value="<%= degrees_people_path %>"
+       data-room-base-url-value="<%= degrees_room_path(@room.code) %>">
+    <%= link_to "← Six Degrees", degrees_path, class: "text-sm text-slate-500 hover:underline" %>
+    <div class="mt-2 mb-4 flex flex-wrap items-baseline justify-between gap-x-4">
+      <h1 class="text-3xl font-bold">Six Degrees <span class="text-slate-400">with a friend</span></h1>
+      <p class="text-sm text-slate-500">Room <span class="font-mono font-semibold tracking-wider text-slate-700"><%= @room.code %></span> · <span data-room-target="status"></span></p>
+    </div>
+
+    <% if @seat.nil? %>
+      <p class="mb-4 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700" role="note">
+        Room full: both seats are taken, so you're watching. Moves appear live.
+      </p>
+    <% end %>
+
+    <p data-room-target="connection" hidden role="status" class="mb-3 rounded-lg bg-amber-100 p-2 text-center text-sm text-amber-900">Connection lost. Reconnecting…</p>
+
+    <section data-room-target="invite" aria-label="Invite a friend" class="mb-4 rounded-xl border-2 border-dashed border-slate-300 bg-white p-4">
+      <p class="font-semibold">Invite a friend</p>
+      <p class="text-sm text-slate-500">Send them this link. The game starts when they join.</p>
+      <div class="mt-3 flex flex-col gap-2 sm:flex-row">
+        <input type="text" readonly value="<%= invite_url %>" aria-label="Invite link" data-room-target="inviteInput" data-action="focus->room#selectInvite"
+               class="min-w-0 flex-1 rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 font-mono text-sm">
+        <button type="button" data-action="room#copyInvite" class="rounded-lg bg-slate-900 px-4 py-2 font-medium text-white">Copy link</button>
+      </div>
+      <p data-room-target="copyStatus" class="mt-1 min-h-5 text-sm text-emerald-700" role="status"></p>
+    </section>
+
+    <section aria-label="Players" class="mb-4">
+      <div data-room-target="players" class="flex gap-3"></div>
+      <label class="mt-2 flex items-center gap-2 text-sm text-slate-600">
+        Your name
+        <input type="text" maxlength="<%= Room::MAX_NAME %>" data-room-target="nameInput" data-action="change->room#rename"
+               class="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-1 sm:max-w-xs">
+      </label>
+    </section>
+
+    <div data-room-target="banner" role="status" aria-live="polite"></div>
+    <p data-room-target="thinking" hidden class="mt-1 text-center text-sm text-slate-500 motion-safe:animate-pulse">thinking…</p>
+    <p data-room-target="message" role="status" class="mt-2 min-h-6 text-center text-sm text-red-700"></p>
+
+    <div class="mt-3 flex justify-center">
+      <button type="button" data-room-target="roundButton" data-action="room#startRound" hidden
+              class="rounded-lg bg-slate-900 px-6 py-3 text-lg font-medium text-white disabled:opacity-60">Start game</button>
+    </div>
+
+    <div data-room-target="pair" hidden class="mt-6 flex items-start justify-center gap-3 sm:gap-8"></div>
+
+    <section data-room-target="bidPanel" hidden aria-label="Bid" class="mt-6 rounded-xl border border-slate-200 bg-white p-4 text-center">
+      <p data-bid-label class="mb-3 font-medium">I can connect them in… <span class="text-slate-500">(hops, lower beats the last bid)</span></p>
+      <div data-room-target="bidButtons" class="flex flex-wrap items-center justify-center gap-2"></div>
+      <button type="button" data-room-target="callButton" data-action="room#call" hidden
+              class="mt-4 rounded-lg bg-amber-500 px-6 py-3 text-lg font-semibold text-white hover:bg-amber-600">Go for it</button>
+      <p class="mt-2 text-xs text-slate-500">"Go for it" means you can't beat that bid: they must prove it.</p>
+    </section>
+
+    <section data-room-target="chainPanel" hidden class="mt-8" aria-label="The chain">
+      <div class="mb-3 flex items-baseline justify-between">
+        <h2 class="text-sm font-semibold uppercase tracking-wide text-slate-500">The chain</h2>
+        <p data-room-target="hops" class="text-sm font-medium text-slate-600"></p>
+      </div>
+      <ol data-room-target="chain" class="flex flex-wrap items-start gap-y-4"></ol>
+    </section>
+
+    <div data-room-target="play" hidden class="mt-6">
+      <div class="relative max-w-2xl">
+        <label for="guess" class="mb-1 block text-sm font-medium text-slate-700">
+          Who shares a credit with <span data-last-name class="font-semibold"></span>?
+        </label>
+        <input id="guess" type="search" autocomplete="off" placeholder="Search an actor…" data-room-target="input"
+               data-action="input->room#search keydown->room#key"
+               class="w-full rounded-lg border border-slate-300 px-4 py-3 text-lg">
+        <ul data-room-target="results" hidden class="absolute z-10 mt-1 flex w-full flex-col gap-1 rounded-lg border border-slate-200 bg-white p-1 shadow-lg"></ul>
+      </div>
+      <button type="button" data-room-target="giveUp" data-action="room#giveUp"
+              class="mt-3 rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-100">Give up this round</button>
+    </div>
+
+    <section data-room-target="rules" class="mt-8 rounded-xl border border-slate-200 bg-white p-4" aria-label="Rules">
+      <h2 class="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">Rules</h2>
+      <div class="flex flex-wrap gap-x-6 gap-y-2 text-sm text-slate-700">
+        <% { "skip_self" => "Skip Self credits", "skip_voice" => "Skip voice acting", "skip_marvel" => "Skip Marvel", "movies_only" => "Movies only" }.each do |rule, label| %>
+          <label class="flex items-center gap-2">
+            <input type="checkbox" class="h-4 w-4" data-room-target="rule" data-rule="<%= rule %>" data-action="change->room#changeRule">
+            <%= label %>
+          </label>
+        <% end %>
+      </div>
+      <p data-rules-note class="mt-2 text-xs text-slate-500"></p>
+    </section>
+  </div>
+<% end %>

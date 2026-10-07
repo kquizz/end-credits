@@ -21,6 +21,13 @@ Rails.application.routes.draw do
   get "degrees/people", to: "degrees#people", as: :degrees_people, defaults: { format: :json }
   get "degrees/guess", to: "degrees#guess", as: :degrees_guess, defaults: { format: :json }
 
+  # Live two-player rooms. Moves are POSTs that answer with the new state JSON; RoomChannel pushes it too.
+  post "degrees/rooms", to: "degrees/rooms#create", as: :degrees_rooms
+  get "degrees/rooms/:code", to: "degrees/rooms#show", as: :degrees_room
+  %w[join set_name set_rules bid challenge give_up next_round guess].each do |action|
+    post "degrees/rooms/:code/#{action}", to: "degrees/rooms##{action}", as: "degrees_room_#{action}"
+  end
+
   # The EGOT table and the ages table share the same pickers; `tool` picks the table.
   { "cast" => "egot", "ages" => "ages" }.each do |prefix, tool|
     defaults tool: tool do
