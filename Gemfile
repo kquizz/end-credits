@@ -59,7 +59,7 @@ group :development do
   gem "web-console"
 end
 
-gem "faraday", "~> 2.14"
+gem "faraday", "~> 2.15"
 
 gem "rspec-rails", "~> 8.0", groups: [ :development, :test ]
 
